@@ -354,6 +354,12 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
               <input id="add-addr" placeholder="通訊地址"/>
             </div>
           </div>
+          <div class="frow full">
+            <div class="fg">
+              <label class="flabel">備註社工</label>
+              <input id="add-note-worker" placeholder="例：張素嬌（可留空）"/>
+            </div>
+          </div>
           <!-- 重複提示 -->
           <div id="add-dup-warn" style="display:none;background:var(--amber-l);border:1px solid #FAC775;border-radius:var(--r);padding:9px 12px;font-size:12px;color:var(--amber-d);margin-bottom:10px;">
             ⚠️ 系統發現已有相同地區與名稱的資源單位：<span id="add-dup-info"></span>，請確認是否仍要新增。
@@ -884,6 +890,7 @@ function submitAdd(){
   const phone  = gv('add-phone').trim();
   const mobile = gv('add-mobile').trim();
   const addr   = gv('add-addr').trim();
+  const noteWorker = gv('add-note-worker').trim();
   const sub    = cat==='里長' ? gv('add-sub-village').trim() : '';
   const catOther = cat==='其他' ? gv('add-cat-other').trim() : '';
 
@@ -893,7 +900,7 @@ function submitAdd(){
   if(cat==='其他' && !catOther){ alert('請填寫其他說明'); return; }
   if(!name){ alert('請填寫單位名稱'); return; }
 
-  db.networks.push({ id:uid(), area, cat, sub, catOther, name, phone, mobile, addr });
+  db.networks.push({ id:uid(), area, cat, sub, catOther, name, phone, mobile, addr, noteWorker });
   save();
   populateFilters();
   renderSearch();
@@ -902,7 +909,7 @@ function submitAdd(){
 }
 
 function clearAdd(){
-  ['add-area','add-name','add-phone','add-mobile','add-addr','add-sub-village','add-cat-other'].forEach(id=>{
+  ['add-area','add-name','add-phone','add-mobile','add-addr','add-sub-village','add-cat-other','add-note-worker'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
   document.getElementById('add-cat').value='';
@@ -1235,11 +1242,14 @@ function renderMgmt(){
   if(!pageNets.length){c.innerHTML='<div class="empty">找不到符合的資源單位</div>';renderMgmtPagination(0,1);return;}
   c.innerHTML=`<div class="hlist">${pageNets.map(n=>{
     const recs=db.records.filter(r=>r.nid===n.id).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-    const recSummary=recs.length?recs.slice(0,3).map(r=>`<div style="font-size:11px;color:var(--sub);padding:3px 0;border-bottom:1px solid var(--border);">
-      <span class="badge ${r.type==='visit'?'b-green':'b-blue'}" style="font-size:10px;">${r.type==='visit'?'拜會':'記事'}</span>
-      <span style="margin-left:4px;">${r.date||''}</span>
-      <span style="color:var(--hint);margin-left:6px;">社工：${r.worker||'—'}</span>
-      <div style="color:var(--text);margin-top:2px;line-height:1.5;">${r.content.slice(0,50)}${r.content.length>50?'…':''}</div>
+    const recSummary=recs.length?recs.slice(0,3).map(r=>`<div style="font-size:11px;color:var(--sub);padding:3px 0;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:8px;">
+      <div style="flex:1;">
+        <span class="badge ${r.type==='visit'?'b-green':'b-blue'}" style="font-size:10px;">${r.type==='visit'?'拜會':'記事'}</span>
+        <span style="margin-left:4px;">${r.date||''}</span>
+        <span style="color:var(--hint);margin-left:6px;">社工：${r.worker||'—'}</span>
+        <div style="color:var(--text);margin-top:2px;line-height:1.5;">${r.content.slice(0,50)}${r.content.length>50?'…':''}</div>
+      </div>
+      <button class="btn btn-sm" style="flex-shrink:0;margin-top:2px;" onclick="editRecWorker('${r.id}','${(r.worker||'').replace(/'/g,'')}')">改社工</button>
     </div>`).join(''):'';
     return `<div class="hitem">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:${recs.length?'8px':'0'};">
@@ -1248,6 +1258,7 @@ function renderMgmt(){
           <div>
             <div style="font-weight:500;font-size:13px;">${n.name} <span class="badge b-amber" style="font-size:10px;">${n.cat}</span>
               <span style="font-size:11px;color:var(--hint);font-weight:400;margin-left:4px;">${recs.length} 筆互動</span>
+              ${n.noteWorker?`<span style="font-size:11px;color:var(--blue);margin-left:6px;">備註社工：${n.noteWorker}</span>`:''}
             </div>
             <div style="font-size:11px;color:var(--sub);">${n.area}${n.sub?' · '+n.sub:''} ${[n.phone,n.mobile].filter(Boolean).join(' / ')}</div>
           </div>
@@ -1284,6 +1295,19 @@ function renderMgmtPagination(total,totalPages){
 
 function goMgmtPage(p){ mgmtPage=p; renderMgmt(); document.getElementById('p-mgmt').scrollTop=0; }
 
+// ── 編輯互動記錄社工姓名 ──
+function editRecWorker(rid, currentWorker){
+  const newWorker = prompt('請輸入新的社工姓名：', currentWorker);
+  if(newWorker === null) return; // 取消
+  const rec = db.records.find(r=>r.id===rid);
+  if(rec){
+    rec.worker = newWorker.trim();
+    save();
+    populateFilters();
+    renderMgmt();
+  }
+}
+
 // ── Modal 新增/編輯 ──
 function openModal(id){
   editId=id;
@@ -1315,6 +1339,9 @@ function openModal(id){
     <div class="frow full">
       <div class="fg"><label class="flabel">地址</label><input id="m-addr" value="${v.addr||''}" placeholder="通訊地址"/></div>
     </div>
+    <div class="frow full">
+      <div class="fg"><label class="flabel">備註社工</label><input id="m-note-worker" value="${v.noteWorker||''}" placeholder="例：張素嬌（可留空）"/></div>
+    </div>
     <div class="factions">
       <button class="btn btn-p" onclick="saveNet()">儲存</button>
       <button class="btn" onclick="closeModal()">取消</button>
@@ -1331,7 +1358,7 @@ function saveNet(){
   const name=gv('m-name').trim(),area=gv('m-area').trim(),cat=gv('m-cat');
   if(!name||!area){alert('請填寫地區與名稱');return;}
   const catOther=cat==='其他'?gv('m-cat-other').trim():'';
-  const data={area,cat,catOther,sub:gv('m-sub').trim(),name,phone:gv('m-phone').trim(),mobile:gv('m-mobile').trim(),addr:gv('m-addr').trim()};
+  const data={area,cat,catOther,sub:gv('m-sub').trim(),name,phone:gv('m-phone').trim(),mobile:gv('m-mobile').trim(),addr:gv('m-addr').trim(),noteWorker:gv('m-note-worker').trim()};
   if(editId){ Object.assign(db.networks.find(n=>n.id===editId),data); }
   else { db.networks.push({id:uid(),...data}); }
   save(); closeModal(); renderMgmt(); populateFilters();
