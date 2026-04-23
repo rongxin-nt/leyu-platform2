@@ -784,19 +784,6 @@ function quickRec(nid,cat){
   setTimeout(()=>{ setSS('rc',nid); },80);
 }
 
-// ── 歷史 ──
-function renderHist(){
-  const area=gv('h-area'),cat=gv('h-cat'),kw=gv('h-kw').toLowerCase(),type=gv('h-type'),worker=gv('h-worker');
-  let recs=[...db.records].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-  recs=recs.filter(r=>{
-    const net=db.networks.find(n=>n.id===r.nid)||{};
-    if(area&&net.area!==area) return false;
-    if(cat&&net.cat!==cat) return false;
-    if(kw&&!(net.name||'').toLowerCase().includes(kw)&&!(net.sub||'').toLowerCase().includes(kw)) return false;
-    if(type&&r.type!==type) return false;
-    if(worker&&r.worker!==worker) return false;
-    return true;
-  });
 // ── 歷史（含分頁）──
 let histPage = 1;
 
@@ -858,8 +845,6 @@ function renderHistPagination(total,totalPages){
 }
 
 function goHistPage(p){ histPage=p; renderHist(); document.getElementById('p-hist').scrollTop=0; }
-  }).join('')}</div>`;
-}
 
 // ── 新增資源單位 ──
 function toggleAddCatFields(){
