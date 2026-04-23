@@ -20,10 +20,12 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
 .topbar{background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 1.25rem;height:52px;flex-shrink:0;}
 .brand{display:flex;align-items:center;gap:8px;font-size:16px;font-weight:700;}
 .brand-dot{width:8px;height:8px;border-radius:50%;background:var(--blue);}
-.tabs{display:flex;gap:2px;}
+.tabs{display:flex;gap:2px;align-items:center;}
 .tab{padding:6px 14px;border-radius:var(--r);font-size:13px;font-weight:500;cursor:pointer;color:var(--sub);border:none;background:none;font-family:inherit;transition:all .15s;}
 .tab:hover{background:var(--bg);color:var(--text);}
 .tab.on{background:var(--blue-l);color:var(--blue-d);}
+.tab-lock{font-size:12px;color:var(--hint);padding:6px 10px;cursor:pointer;border:none;background:none;font-family:inherit;}
+.tab-lock:hover{color:var(--sub);}
 .body{display:flex;flex:1;overflow:hidden;}
 .sidebar{width:188px;background:var(--surface);border-right:1px solid var(--border);padding:1rem 0;overflow-y:auto;flex-shrink:0;}
 .nav-sec{font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--hint);padding:0 1rem;margin:1rem 0 4px;text-transform:uppercase;}
@@ -47,6 +49,7 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
 .ava{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;}
 .ava-blue{background:var(--blue-l);color:var(--blue-d);}
 .ava-green{background:var(--green-l);color:var(--green-d);}
+.ava-amber{background:var(--amber-l);color:var(--amber-d);}
 .cname{font-size:14px;font-weight:700;line-height:1.3;}
 .ctag{font-size:11px;color:var(--sub);}
 .cbody{font-size:12px;color:var(--sub);display:flex;flex-direction:column;gap:4px;border-top:1px solid var(--border);padding-top:8px;}
@@ -73,7 +76,6 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
 .factions{display:flex;gap:8px;margin-top:4px;align-items:center;}
 .toast{display:none;padding:9px 12px;border-radius:var(--r);font-size:12px;margin-top:10px;align-items:center;gap:6px;}
 .t-ok{background:var(--green-l);color:var(--green-d);border:1px solid #8ACA9C;}
-.t-err{background:var(--red-l);color:var(--red);border:1px solid #F0A0A0;display:block;}
 .hlist{display:flex;flex-direction:column;gap:8px;}
 .hitem{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:.875rem 1rem;}
 .hitem:hover{border-color:var(--border2);}
@@ -92,19 +94,20 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
 .chart-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:1rem 1.25rem;margin-bottom:1rem;}
 .chart-title{font-size:13px;font-weight:500;margin-bottom:.75rem;}
 .bar-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
-.bar-label{font-size:12px;color:var(--sub);width:80px;text-align:right;flex-shrink:0;}
+.bar-label{font-size:12px;color:var(--sub);width:90px;text-align:right;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .bar-track{flex:1;height:18px;background:var(--bg);border-radius:4px;overflow:hidden;}
 .bar-fill{height:100%;border-radius:4px;}
 .bar-val{font-size:11px;color:var(--hint);width:30px;flex-shrink:0;}
-.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:200;align-items:center;justify-content:center;}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;align-items:center;justify-content:center;}
 .overlay.on{display:flex;}
-.modal{background:var(--surface);border-radius:var(--rl);padding:1.5rem;width:520px;max-width:90vw;max-height:85vh;overflow-y:auto;}
+.modal{background:var(--surface);border-radius:var(--rl);padding:1.5rem;width:520px;max-width:92vw;max-height:88vh;overflow-y:auto;}
 .modal-title{font-size:16px;font-weight:700;margin-bottom:1rem;}
 .modal-close{float:right;cursor:pointer;color:var(--hint);font-size:18px;line-height:1;border:none;background:none;}
-.ttype-bar{display:flex;gap:6px;margin-bottom:1rem;}
+.ttype-bar{display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap;}
 .ttype{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border2);background:var(--surface);color:var(--sub);font-family:inherit;}
 .ttype.on{background:var(--blue);color:#fff;border-color:var(--blue);}
 .empty{text-align:center;padding:2.5rem;color:var(--hint);font-size:13px;}
+.action-bar{display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;}
 @media(max-width:640px){.sidebar{display:none;}.content{padding:1rem;}.frow{grid-template-columns:1fr;}}
 </style>
 </head>
@@ -113,36 +116,37 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
   <div class="topbar">
     <div class="brand"><div class="brand-dot"></div>樂悅 網絡資源平台</div>
     <div class="tabs">
-      <button class="tab on" onclick="switchMode('social')">社工模式</button>
-      <button class="tab" onclick="switchMode('super')">督導模式</button>
+      <button class="tab on" id="tab-social" onclick="switchMode('social')">社工模式</button>
+      <button class="tab" id="tab-super" onclick="askSuperPwd()">督導模式</button>
+      <button class="tab-lock" id="btn-logout" style="display:none" onclick="logout()" title="離開督導模式">🔒 登出</button>
     </div>
   </div>
   <div class="body">
     <nav class="sidebar">
       <div class="nav-sec">查詢</div>
-      <div class="nav on" onclick="go('search')" id="n-search">🔍 查詢網絡</div>
+      <div class="nav on" onclick="go('search')" id="n-search">🔍 查詢資源單位</div>
       <div class="nav" onclick="go('hist')" id="n-hist">📋 歷史記錄</div>
       <div class="nav-sec">填寫</div>
       <div class="nav" onclick="go('rec')" id="n-rec">✏️ 合作記事</div>
       <div class="nav" onclick="go('visit')" id="n-visit">🤝 里長拜會</div>
-      <div class="nav-sec" id="nav-sup" style="display:none">督導</div>
+      <div class="nav-sec">資料管理</div>
+      <div class="nav" onclick="go('import')" id="n-import">📋 批次匯入</div>
+      <div class="nav-sec" id="nav-sup" style="display:none">督導專區</div>
       <div class="nav" onclick="go('stats')" id="n-stats" style="display:none">📊 統計報表</div>
-      <div class="nav" onclick="go('mgmt')" id="n-mgmt" style="display:none">⚙️ 管理網絡</div>
+      <div class="nav" onclick="go('mgmt')" id="n-mgmt" style="display:none">⚙️ 管理資源單位</div>
     </nav>
     <div class="content">
 
       <!-- 查詢 -->
       <div class="page on" id="p-search">
-        <div class="pg-title">查詢網絡</div>
-        <div class="pg-desc">搜尋里長或資源單位的聯絡資訊與互動次數。</div>
-        <div class="ttype-bar">
+        <div class="pg-title">查詢資源單位</div>
+        <div class="pg-desc">搜尋各類資源單位的聯絡資訊與互動記錄。</div>
+        <div class="ttype-bar" id="cat-filter-bar">
           <button class="ttype on" onclick="setNT('all',this)">全部</button>
-          <button class="ttype" onclick="setNT('village',this)">里長</button>
-          <button class="ttype" onclick="setNT('org',this)">資源單位</button>
         </div>
         <div class="sbar">
           <select id="s-area" onchange="renderSearch()"><option value="">全部地區</option></select>
-          <input id="s-kw" placeholder="搜尋名稱、里別..." oninput="renderSearch()"/>
+          <input id="s-kw" placeholder="搜尋名稱..." oninput="renderSearch()"/>
         </div>
         <div class="rmeta" id="s-meta"></div>
         <div id="s-list"></div>
@@ -151,10 +155,11 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
       <!-- 歷史 -->
       <div class="page" id="p-hist">
         <div class="pg-title">歷史互動記錄</div>
-        <div class="pg-desc">查詢所有社工與網絡的互動記錄。</div>
+        <div class="pg-desc">查詢所有社工與資源單位的互動記錄。</div>
         <div class="sbar">
           <select id="h-area" onchange="renderHist()"><option value="">全部地區</option></select>
-          <input id="h-kw" placeholder="網絡名稱、里別..." oninput="renderHist()"/>
+          <select id="h-cat" onchange="renderHist()"><option value="">全部單位別</option></select>
+          <input id="h-kw" placeholder="單位名稱..." oninput="renderHist()"/>
           <select id="h-type" onchange="renderHist()">
             <option value="">全部類型</option>
             <option value="rec">合作記事</option>
@@ -169,20 +174,19 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
       <!-- 合作記事 -->
       <div class="page" id="p-rec">
         <div class="pg-title">填寫合作記事</div>
-        <div class="pg-desc">記錄與里長或資源單位的互動狀況。</div>
+        <div class="pg-desc">記錄與資源單位的互動狀況。</div>
         <div class="fcard">
           <div class="frow">
             <div class="fg"><label class="flabel">填寫社工</label><input id="rc-worker" placeholder="請輸入姓名"/></div>
             <div class="fg"><label class="flabel">日期</label><input type="date" id="rc-date"/></div>
           </div>
           <div class="frow">
-            <div class="fg"><label class="flabel">網絡類型</label>
-              <select id="rc-ntype" onchange="updateNetSel('rc')">
-                <option value="village">里長</option>
-                <option value="org">資源單位</option>
+            <div class="fg"><label class="flabel">單位別</label>
+              <select id="rc-cat" onchange="updateNetSel('rc')">
+                <option value="">全部</option>
               </select>
             </div>
-            <div class="fg"><label class="flabel">選擇網絡</label>
+            <div class="fg"><label class="flabel">選擇資源單位</label>
               <select id="rc-net"></select>
             </div>
           </div>
@@ -229,6 +233,50 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
         </div>
       </div>
 
+      <!-- 批次匯入（社工+督導都能用）-->
+      <div class="page" id="p-import">
+        <div class="pg-title">批次匯入資源單位</div>
+        <div class="pg-desc">從 Excel 複製資料後貼入，可一次匯入多筆資源單位。</div>
+        <div class="fcard" style="max-width:660px;">
+          <div style="background:var(--bg);border-radius:var(--r);padding:12px;margin-bottom:14px;font-size:12px;color:var(--sub);line-height:1.8;">
+            <div style="font-weight:500;color:var(--text);margin-bottom:4px;">欄位順序（請依照此順序複製 Excel 資料）：</div>
+            <strong style="color:var(--text);">地區　→　單位別　→　單位名稱　→　聯絡電話　→　手機　→　地址</strong><br>
+            第一行若是標題列會自動略過。
+          </div>
+          <div class="fg" style="margin-bottom:12px;">
+            <label class="flabel">貼上 Excel 複製的資料</label>
+            <textarea id="import-text" style="min-height:150px;font-family:monospace;font-size:12px;" placeholder="從 Excel 選取資料後 Ctrl+C，再到這裡 Ctrl+V 貼上..."></textarea>
+          </div>
+          <div class="factions" style="margin-bottom:12px;">
+            <button class="btn btn-p" onclick="previewImport()">預覽資料</button>
+            <button class="btn" onclick="document.getElementById('import-text').value='';resetImport();">清除</button>
+          </div>
+
+          <div id="import-preview" style="display:none;margin-bottom:12px;">
+            <div style="font-size:12px;font-weight:500;color:var(--text);margin-bottom:6px;" id="preview-title"></div>
+            <div style="max-height:220px;overflow:auto;border:1px solid var(--border);border-radius:var(--r);">
+              <table style="width:100%;font-size:11px;border-collapse:collapse;" id="preview-table"></table>
+            </div>
+          </div>
+
+          <div id="import-conflict" style="display:none;margin-bottom:12px;">
+            <div style="background:var(--amber-l);border:1px solid #FAC775;border-radius:var(--r);padding:10px 12px;font-size:12px;color:var(--amber-d);">
+              <div style="font-weight:500;margin-bottom:6px;">⚠️ 發現重複資料，請選擇處理方式：</div>
+              <div id="conflict-list" style="margin-bottom:8px;max-height:100px;overflow-y:auto;line-height:1.8;"></div>
+              <div style="display:flex;gap:8px;">
+                <button class="btn btn-sm" onclick="setConflict('overwrite')" id="btn-overwrite">全部覆蓋</button>
+                <button class="btn btn-sm" onclick="setConflict('skip')" id="btn-skip">全部跳過</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="btn-confirm-wrap" style="display:none;">
+            <button class="btn btn-p btn-lg" onclick="confirmImport()">確認匯入</button>
+          </div>
+          <div id="import-result" style="display:none;padding:9px 12px;border-radius:var(--r);font-size:12px;margin-top:10px;background:var(--green-l);color:var(--green-d);border:1px solid #8ACA9C;"></div>
+        </div>
+      </div>
+
       <!-- 統計 -->
       <div class="page" id="p-stats">
         <div class="pg-title">統計報表</div>
@@ -238,11 +286,10 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
 
       <!-- 管理 -->
       <div class="page" id="p-mgmt">
-        <div class="pg-title">管理網絡資料</div>
-        <div class="pg-desc">新增或管理里長、資源單位的基本資料。</div>
-        <div style="display:flex;gap:8px;margin-bottom:1rem;">
-          <button class="btn btn-p" onclick="openModal('village',null)">＋ 新增里長</button>
-          <button class="btn btn-g" onclick="openModal('org',null)">＋ 新增資源單位</button>
+        <div class="pg-title">管理資源單位</div>
+        <div class="pg-desc">新增或管理各類資源單位的基本資料。</div>
+        <div class="action-bar">
+          <button class="btn btn-p" onclick="openModal(null)">＋ 新增資源單位</button>
         </div>
         <div id="mgmt-list"></div>
       </div>
@@ -251,7 +298,24 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
   </div>
 </div>
 
-<!-- Modal -->
+<!-- 密碼驗證 Modal -->
+<div class="overlay" id="pwd-modal">
+  <div class="modal" style="width:360px;">
+    <div class="modal-title">🔐 督導模式驗證</div>
+    <div style="font-size:13px;color:var(--sub);margin-bottom:14px;">請輸入督導密碼以進入管理功能。</div>
+    <div class="fg" style="margin-bottom:12px;">
+      <label class="flabel">密碼</label>
+      <input type="password" id="pwd-input" placeholder="請輸入密碼" onkeydown="if(event.key==='Enter')checkPwd()"/>
+    </div>
+    <div id="pwd-err" style="display:none;font-size:12px;color:var(--red);margin-bottom:8px;">密碼錯誤，請再試一次。</div>
+    <div class="factions">
+      <button class="btn btn-p" onclick="checkPwd()">確認</button>
+      <button class="btn" onclick="closePwdModal()">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- 新增/編輯 Modal -->
 <div class="overlay" id="modal">
   <div class="modal">
     <button class="modal-close" onclick="closeModal()">✕</button>
@@ -261,34 +325,43 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
 </div>
 
 <script>
-const STORAGE_KEY = 'leyu_db_v1';
+// ══════════════════════════════
+// ★ 督導密碼設定區 ★
+// 請把下面的 leyu2024 改成你想要的密碼
+const SUPER_PASSWORD = 'leyu2024';
+// ══════════════════════════════
+
+const STORAGE_KEY = 'leyu_db_v2';
+const UNIT_CATS = ['里長','公部門','民間單位','長照單位','勞政單位','其他'];
+
 let db = {networks:[], records:[]};
 let curNT = 'all';
 let editId = null;
-let modalType = 'village';
+let parsedRows = [];
+let conflictMode = null;
+let isSuperMode = false;
 
-// ── 儲存（localStorage）──
-function save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); } catch(e){} }
-function load() {
-  try {
+// ── 儲存 ──
+function save(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); }catch(e){} }
+function load(){
+  try{
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) { db = JSON.parse(raw); return; }
-  } catch(e){}
-  // 預設示範資料
+    if(raw){ db = JSON.parse(raw); return; }
+  }catch(e){}
   db = {
-    networks: [
-      {id:'n1',type:'village',area:'蘆洲區',sub:'永安里',name:'李建興',phone:'02-2288-5918',mobile:'0928-201-526',addr:'新北市蘆洲區永安南路二段16巷9號3樓'},
-      {id:'n2',type:'village',area:'蘆洲區',sub:'仁復里',name:'何唯菁',phone:'02-8281-5221',mobile:'0978-341-379',addr:'新北市蘆洲區得勝街69巷16號1樓'},
-      {id:'n3',type:'village',area:'蘆洲區',sub:'仁義里',name:'何益銘',phone:'02-2289-1048',mobile:'0963-978-335',addr:'新北市蘆洲區信義路192號1樓'},
-      {id:'n4',type:'village',area:'八里區',sub:'龍源里',name:'林俊德',phone:'',mobile:'',addr:'八里區龍源里'},
-      {id:'n5',type:'village',area:'五股區',sub:'成泰里',name:'潘明宏',phone:'',mobile:'',addr:'五股區成泰里'},
-      {id:'n6',type:'org',area:'蘆洲區',sub:'身心障礙服務',name:'蘆洲區輔具中心',phone:'02-2281-0000',mobile:'',addr:'新北市蘆洲區'},
-      {id:'n7',type:'org',area:'新北市',sub:'社政資源',name:'新北市社會局',phone:'02-2960-3456',mobile:'',addr:'新北市板橋區'},
+    networks:[
+      {id:'n1',cat:'里長',area:'蘆洲區',name:'李建興',sub:'永安里',phone:'02-2288-5918',mobile:'0928-201-526',addr:'新北市蘆洲區永安南路二段16巷9號3樓'},
+      {id:'n2',cat:'里長',area:'蘆洲區',name:'何唯菁',sub:'仁復里',phone:'02-8281-5221',mobile:'0978-341-379',addr:'新北市蘆洲區得勝街69巷16號1樓'},
+      {id:'n3',cat:'里長',area:'蘆洲區',name:'何益銘',sub:'仁義里',phone:'02-2289-1048',mobile:'0963-978-335',addr:'新北市蘆洲區信義路192號1樓'},
+      {id:'n4',cat:'里長',area:'八里區',name:'林俊德',sub:'龍源里',phone:'',mobile:'',addr:'八里區龍源里'},
+      {id:'n5',cat:'里長',area:'五股區',name:'潘明宏',sub:'成泰里',phone:'',mobile:'',addr:'五股區成泰里'},
+      {id:'n6',cat:'公部門',area:'新北市',name:'新北市社會局',sub:'社政資源',phone:'02-2960-3456',mobile:'',addr:'新北市板橋區'},
+      {id:'n7',cat:'長照單位',area:'蘆洲區',name:'蘆洲區輔具中心',sub:'身心障礙服務',phone:'02-2281-0000',mobile:'',addr:'新北市蘆洲區'},
     ],
-    records: [
+    records:[
       {id:'r1',type:'rec',nid:'n1',worker:'張素嬌',date:'2026/04/02',method:'',content:'里長很客氣，提供仁復里發展協會送餐資訊，可協助午餐1餐。'},
       {id:'r2',type:'visit',nid:'n2',worker:'廖珮君',date:'2026/04/10',method:'親自拜訪',content:'里長表示了解服務內容，社工留存中心文宣資料。'},
-      {id:'r3',type:'rec',nid:'n4',worker:'蕭鐺霖',date:'2025/10/15',method:'',content:'里長說要行文才能協助找人，口氣較兇，需再次說明服務。'},
+      {id:'r3',type:'rec',nid:'n4',worker:'蕭鐺霖',date:'2025/10/15',method:'',content:'里長說要行文才能協助找人，需再次說明服務。'},
       {id:'r4',type:'visit',nid:'n3',worker:'張素嬌',date:'2026/04/14',method:'電話聯繫',content:'里長說輔具中心不協助回收舊電動床，會找議員反應。'},
     ]
   };
@@ -300,63 +373,122 @@ function todayStr(){ return new Date().toISOString().split('T')[0]; }
 function fmt(d){ return (d||'').replace(/-/g,'/'); }
 function gv(id){ return (document.getElementById(id)||{}).value||''; }
 
-// ── 模式 ──
-let mode = 'social';
-function switchMode(m) {
-  mode = m;
-  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('on',['social','super'][i]===m));
-  const sup = m==='super';
-  ['nav-sup','n-stats','n-mgmt'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display=sup?'':'none'; });
-  sup ? go('stats') : go('search');
+// ── 單位別顏色 ──
+const CAT_AVA = {
+  '里長':'ava-blue','公部門':'ava-green','民間單位':'ava-amber',
+  '長照單位':'ava-blue','勞政單位':'ava-green','其他':'ava-amber'
+};
+function catAva(cat){ return CAT_AVA[cat]||'ava-blue'; }
+
+// ── 密碼驗證 ──
+function askSuperPwd(){
+  if(isSuperMode){ switchMode('super'); return; }
+  document.getElementById('pwd-input').value='';
+  document.getElementById('pwd-err').style.display='none';
+  document.getElementById('pwd-modal').classList.add('on');
+  setTimeout(()=>document.getElementById('pwd-input').focus(),100);
 }
 
-// ── 頁面 ──
-function go(p) {
+function checkPwd(){
+  const pwd = document.getElementById('pwd-input').value;
+  if(pwd === SUPER_PASSWORD){
+    isSuperMode = true;
+    closePwdModal();
+    switchMode('super');
+  } else {
+    document.getElementById('pwd-err').style.display='block';
+    document.getElementById('pwd-input').value='';
+    document.getElementById('pwd-input').focus();
+  }
+}
+
+function closePwdModal(){ document.getElementById('pwd-modal').classList.remove('on'); }
+
+function logout(){
+  isSuperMode = false;
+  switchMode('social');
+}
+
+// ── 模式切換 ──
+let mode = 'social';
+function switchMode(m){
+  mode = m;
+  const isSuper = m==='super';
+  document.getElementById('tab-social').classList.toggle('on', !isSuper);
+  document.getElementById('tab-super').classList.toggle('on', isSuper);
+  document.getElementById('btn-logout').style.display = isSuper ? '' : 'none';
+  document.getElementById('nav-sup').style.display = isSuper ? '' : 'none';
+  document.getElementById('n-stats').style.display = isSuper ? '' : 'none';
+  document.getElementById('n-mgmt').style.display = isSuper ? '' : 'none';
+  isSuper ? go('stats') : go('search');
+}
+
+// ── 頁面切換 ──
+function go(p){
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('on'));
   document.querySelectorAll('.nav').forEach(x=>x.classList.remove('on'));
   document.getElementById('p-'+p).classList.add('on');
-  const nav = document.getElementById('n-'+p);
-  if (nav) nav.classList.add('on');
-  const fn = {search:renderSearch, hist:renderHist, stats:renderStats, mgmt:renderMgmt, rec:()=>updateNetSel('rc'), visit:updateVisitSel};
-  if (fn[p]) fn[p]();
-  populateAreas();
+  const nav=document.getElementById('n-'+p);
+  if(nav) nav.classList.add('on');
+  const fn={search:renderSearch,hist:renderHist,stats:renderStats,mgmt:renderMgmt,rec:initRecForm,visit:initVisitForm,import:resetImport};
+  if(fn[p]) fn[p]();
+  populateFilters();
 }
 
-// ── 地區 ──
-function populateAreas() {
-  const areas = [...new Set(db.networks.map(n=>n.area).filter(Boolean))];
+// ── 篩選選單填充 ──
+function populateFilters(){
+  const areas=[...new Set(db.networks.map(n=>n.area).filter(Boolean))];
   ['s-area','h-area'].forEach(id=>{
     const sel=document.getElementById(id); if(!sel) return;
     const cur=sel.value; while(sel.options.length>1) sel.remove(1);
     areas.forEach(a=>sel.add(new Option(a,a))); sel.value=cur;
   });
-  const workers=[...new Set(db.records.map(r=>r.worker).filter(Boolean))];
-  const ws=document.getElementById('h-worker'); if(!ws) return;
-  const wcur=ws.value; while(ws.options.length>1) ws.remove(1);
-  workers.forEach(w=>ws.add(new Option(w,w))); ws.value=wcur;
+  const hcat=document.getElementById('h-cat');
+  if(hcat){ const cur=hcat.value; while(hcat.options.length>1) hcat.remove(1); UNIT_CATS.forEach(c=>hcat.add(new Option(c,c))); hcat.value=cur; }
+  const ws=document.getElementById('h-worker');
+  if(ws){ const workers=[...new Set(db.records.map(r=>r.worker).filter(Boolean))]; const wc=ws.value; while(ws.options.length>1) ws.remove(1); workers.forEach(w=>ws.add(new Option(w,w))); ws.value=wc; }
+  // 查詢頁單位別篩選
+  const bar=document.getElementById('cat-filter-bar');
+  if(bar){
+    bar.innerHTML='<button class="ttype '+(curNT==='all'?'on':'')+'" onclick="setNT(\'all\',this)">全部</button>';
+    UNIT_CATS.forEach(c=>{
+      const used=db.networks.some(n=>n.cat===c);
+      if(used) bar.innerHTML+=`<button class="ttype ${curNT===c?'on':''}" onclick="setNT('${c}',this)">${c}</button>`;
+    });
+  }
+  // 合作記事單位別
+  const rccat=document.getElementById('rc-cat');
+  if(rccat){ const cur=rccat.value; while(rccat.options.length>1) rccat.remove(1); UNIT_CATS.forEach(c=>rccat.add(new Option(c,c))); rccat.value=cur; }
 }
 
 // ── 查詢 ──
-function setNT(t,el){ curNT=t; document.querySelectorAll('.ttype').forEach(x=>x.classList.remove('on')); el.classList.add('on'); renderSearch(); }
+function setNT(t,el){
+  curNT=t;
+  document.querySelectorAll('#cat-filter-bar .ttype').forEach(x=>x.classList.remove('on'));
+  el.classList.add('on');
+  renderSearch();
+}
 
-function renderSearch() {
-  const area=gv('s-area'), kw=gv('s-kw').toLowerCase();
+function renderSearch(){
+  const area=gv('s-area'),kw=gv('s-kw').toLowerCase();
   const nets=db.networks.filter(n=>{
-    if(curNT!=='all'&&n.type!==curNT) return false;
+    if(curNT!=='all'&&n.cat!==curNT) return false;
     if(area&&n.area!==area) return false;
-    if(kw&&!(n.name.toLowerCase().includes(kw)||n.sub.toLowerCase().includes(kw))) return false;
+    if(kw&&!(n.name.toLowerCase().includes(kw)||(n.sub||'').toLowerCase().includes(kw))) return false;
     return true;
   });
   document.getElementById('s-meta').textContent=`共 ${nets.length} 筆`;
   const c=document.getElementById('s-list');
-  if(!nets.length){c.innerHTML='<div class="empty">找不到符合的網絡</div>';return;}
+  if(!nets.length){c.innerHTML='<div class="empty">找不到符合的資源單位</div>';return;}
   c.innerHTML=`<div class="grid">${nets.map(n=>{
-    const isV=n.type==='village';
     const cnt=db.records.filter(r=>r.nid===n.id).length;
     return `<div class="card">
       <div class="card-head">
-        <div class="ava ${isV?'ava-blue':'ava-green'}">${n.name.slice(-2)}</div>
-        <div><div class="cname">${n.name}${isV?' 里長':''}</div><div class="ctag">${n.area} ${n.sub} · ${isV?'里長':'資源單位'}</div></div>
+        <div class="ava ${catAva(n.cat)}">${n.name.slice(-2)}</div>
+        <div>
+          <div class="cname">${n.name}</div>
+          <div class="ctag">${n.cat}${n.sub?' · '+n.sub:''} · ${n.area}</div>
+        </div>
       </div>
       <div class="cbody">
         ${n.phone?`<div class="irow"><span class="ik">電話</span><span class="iv">${n.phone}</span></div>`:''}
@@ -365,28 +497,29 @@ function renderSearch() {
         <div class="irow"><span class="ik">互動次數</span><span class="iv" style="color:var(--blue);font-weight:500">${cnt} 次</span></div>
       </div>
       <div class="cfoot">
-        <button class="btn btn-sm" onclick="jumpHist('${n.id}','${n.name}')">查看記錄</button>
-        <button class="btn btn-sm" onclick="quickRec('${n.id}','${n.type}')">快速填寫</button>
+        <button class="btn btn-sm" onclick="jumpHist('${n.id}','${n.name.replace(/'/g,'')}')">查看記錄</button>
+        <button class="btn btn-sm" onclick="quickRec('${n.id}','${n.cat}')">快速填寫</button>
       </div>
     </div>`;
   }).join('')}</div>`;
 }
 
 function jumpHist(nid,name){ go('hist'); document.getElementById('h-kw').value=name; renderHist(); }
-function quickRec(nid,type){
+function quickRec(nid,cat){
   go('rec');
-  document.getElementById('rc-ntype').value=type;
+  document.getElementById('rc-cat').value=cat;
   updateNetSel('rc');
   setTimeout(()=>{ document.getElementById('rc-net').value=nid; },50);
 }
 
 // ── 歷史 ──
-function renderHist() {
-  const area=gv('h-area'),kw=gv('h-kw').toLowerCase(),type=gv('h-type'),worker=gv('h-worker');
+function renderHist(){
+  const area=gv('h-area'),cat=gv('h-cat'),kw=gv('h-kw').toLowerCase(),type=gv('h-type'),worker=gv('h-worker');
   let recs=[...db.records].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   recs=recs.filter(r=>{
     const net=db.networks.find(n=>n.id===r.nid)||{};
     if(area&&net.area!==area) return false;
+    if(cat&&net.cat!==cat) return false;
     if(kw&&!(net.name||'').toLowerCase().includes(kw)&&!(net.sub||'').toLowerCase().includes(kw)) return false;
     if(type&&r.type!==type) return false;
     if(worker&&r.worker!==worker) return false;
@@ -396,12 +529,13 @@ function renderHist() {
   const c=document.getElementById('h-list');
   if(!recs.length){c.innerHTML='<div class="empty">找不到符合的記錄</div>';return;}
   c.innerHTML=`<div class="hlist">${recs.map(r=>{
-    const net=db.networks.find(n=>n.id===r.nid)||{name:'（已刪除）',area:'',sub:'',type:'village'};
-    const isV=net.type==='village';
+    const net=db.networks.find(n=>n.id===r.nid)||{name:'（已刪除）',area:'',sub:'',cat:''};
+    const bClass=r.type==='visit'?'b-green':'b-blue';
     return `<div class="hitem">
       <div class="hmeta">
-        <span class="badge ${r.type==='visit'?'b-green':isV?'b-blue':'b-amber'}">${r.type==='visit'?'里長拜會':'合作記事'}</span>
-        <span class="hwho">${net.area} ${net.sub} ${net.name}${isV?' 里長':''}</span>
+        <span class="badge ${bClass}">${r.type==='visit'?'里長拜會':'合作記事'}</span>
+        ${net.cat?`<span class="badge b-amber">${net.cat}</span>`:''}
+        <span class="hwho">${net.area} ${net.sub||''} ${net.name}</span>
         ${r.worker?`<span class="hwho">社工：${r.worker}</span>`:''}
         ${r.method?`<span class="hwho">${r.method}</span>`:''}
         ${r.date?`<span class="hdate">${r.date}</span>`:''}
@@ -411,52 +545,150 @@ function renderHist() {
   }).join('')}</div>`;
 }
 
-// ── 填寫表單 ──
-function updateNetSel(p) {
-  const type=gv(p+'-ntype')||'village';
+// ── 合作記事表單 ──
+function initRecForm(){ populateFilters(); updateNetSel('rc'); }
+
+function updateNetSel(p){
+  const cat=gv(p+'-cat');
   const sel=document.getElementById(p+'-net');
   sel.innerHTML='<option value="">請選擇...</option>';
-  db.networks.filter(n=>n.type===type).forEach(n=>sel.add(new Option(`${n.area} ${n.sub} ${n.name}`,n.id)));
-}
-function updateVisitSel() {
-  const sel=document.getElementById('vi-net');
-  sel.innerHTML='<option value="">請選擇...</option>';
-  db.networks.filter(n=>n.type==='village').forEach(n=>sel.add(new Option(`${n.area} ${n.sub} ${n.name}里長`,n.id)));
+  db.networks.filter(n=>!cat||n.cat===cat).forEach(n=>
+    sel.add(new Option(`[${n.cat}] ${n.area} ${n.sub||''} ${n.name}`,n.id))
+  );
 }
 
-function submitRec() {
+function submitRec(){
   const worker=gv('rc-worker').trim(),content=gv('rc-content').trim(),nid=gv('rc-net');
   if(!worker){alert('請填寫社工姓名');return;}
-  if(!nid){alert('請選擇網絡');return;}
+  if(!nid){alert('請選擇資源單位');return;}
   if(!content){alert('請填寫互動內容');return;}
   db.records.unshift({id:uid(),type:'rec',nid,worker,date:fmt(gv('rc-date'))||fmt(todayStr()),method:'',content});
-  save(); populateAreas(); showToast('rc-ok'); clearF('rc');
+  save(); populateFilters(); showToast('rc-ok'); clearF('rc');
 }
 
-function submitVisit() {
+// ── 里長拜會表單 ──
+function initVisitForm(){
+  const sel=document.getElementById('vi-net');
+  sel.innerHTML='<option value="">請選擇...</option>';
+  db.networks.filter(n=>n.cat==='里長').forEach(n=>
+    sel.add(new Option(`${n.area} ${n.sub||''} ${n.name}`,n.id))
+  );
+}
+
+function submitVisit(){
   const worker=gv('vi-worker').trim(),content=gv('vi-content').trim(),nid=gv('vi-net');
   if(!worker){alert('請填寫社工姓名');return;}
   if(!nid){alert('請選擇里長');return;}
   if(!content){alert('請填寫拜會狀況');return;}
   db.records.unshift({id:uid(),type:'visit',nid,worker,date:fmt(gv('vi-date'))||fmt(todayStr()),method:gv('vi-method'),content});
-  save(); populateAreas(); showToast('vi-ok'); clearF('vi');
+  save(); populateFilters(); showToast('vi-ok'); clearF('vi');
 }
 
-function clearF(p) {
+function clearF(p){
   ['worker','content'].forEach(f=>{const el=document.getElementById(p+'-'+f);if(el)el.value='';});
   const d=document.getElementById(p+'-date');if(d)d.value=todayStr();
   const n=document.getElementById(p+'-net');if(n)n.value='';
-  if(p==='vi'){const w=document.getElementById('vi-worker');if(w)w.value='';}
 }
 
 function showToast(id){ const el=document.getElementById(id);el.style.display='flex';setTimeout(()=>{el.style.display='none';},4000); }
 
+// ── 批次匯入 ──
+const IMPORT_COLS = ['地區','單位別','單位名稱','聯絡電話','手機','地址'];
+
+function resetImport(){
+  parsedRows=[]; conflictMode=null;
+  document.getElementById('import-preview').style.display='none';
+  document.getElementById('import-conflict').style.display='none';
+  document.getElementById('btn-confirm-wrap').style.display='none';
+  document.getElementById('import-result').style.display='none';
+}
+
+function previewImport(){
+  const raw=document.getElementById('import-text').value.trim();
+  if(!raw){alert('請先貼上資料');return;}
+  const lines=raw.split('\n').map(l=>l.trim()).filter(Boolean);
+  const firstCells=lines[0].split('\t');
+  const isHeader = firstCells[0].includes('地區')||firstCells[2]?.includes('名稱')||firstCells[2]?.includes('姓名');
+  const dataLines = isHeader ? lines.slice(1) : lines;
+
+  parsedRows=dataLines.map(line=>{
+    const cells=line.split('\t').map(c=>c.trim());
+    return { area:cells[0]||'', cat:cells[1]||'', name:cells[2]||'', phone:cells[3]||'', mobile:cells[4]||'', addr:cells[5]||'', sub:'' };
+  }).filter(r=>r.area&&r.name);
+
+  if(!parsedRows.length){alert('沒有解析到有效資料，請確認格式是否正確');return;}
+
+  // 驗證單位別
+  parsedRows.forEach(r=>{
+    if(!UNIT_CATS.includes(r.cat)) r.cat='其他';
+  });
+
+  const table=document.getElementById('preview-table');
+  table.innerHTML=`
+    <thead><tr style="background:var(--bg);">${IMPORT_COLS.map(c=>`<th style="padding:5px 8px;text-align:left;font-weight:500;color:var(--sub);border-bottom:1px solid var(--border);white-space:nowrap;">${c}</th>`).join('')}</tr></thead>
+    <tbody>${parsedRows.map((r,i)=>`
+      <tr style="${i%2===0?'':'background:var(--bg);'}">
+        <td style="padding:4px 8px;">${r.area}</td>
+        <td style="padding:4px 8px;"><span class="badge b-amber">${r.cat}</span></td>
+        <td style="padding:4px 8px;font-weight:500;">${r.name}</td>
+        <td style="padding:4px 8px;">${r.phone}</td>
+        <td style="padding:4px 8px;">${r.mobile}</td>
+        <td style="padding:4px 8px;font-size:11px;">${r.addr}</td>
+      </tr>`).join('')}
+    </tbody>`;
+  document.getElementById('preview-title').textContent=`解析到 ${parsedRows.length} 筆資料，請確認內容：`;
+  document.getElementById('import-preview').style.display='block';
+
+  const conflicts=parsedRows.filter(r=>db.networks.some(n=>n.name===r.name&&n.area===r.area));
+  if(conflicts.length>0){
+    document.getElementById('conflict-list').innerHTML=conflicts.map(r=>`<div>・${r.area} ${r.name}（${r.cat}）</div>`).join('');
+    document.getElementById('import-conflict').style.display='block';
+    document.getElementById('btn-confirm-wrap').style.display='none';
+  } else {
+    document.getElementById('import-conflict').style.display='none';
+    document.getElementById('btn-confirm-wrap').style.display='block';
+    conflictMode='skip';
+  }
+}
+
+function setConflict(mode){
+  conflictMode=mode;
+  document.getElementById('btn-overwrite').style.cssText=mode==='overwrite'?'background:var(--amber);color:#fff;border-color:var(--amber);':'';
+  document.getElementById('btn-skip').style.cssText=mode==='skip'?'background:var(--blue);color:#fff;border-color:var(--blue);':'';
+  document.getElementById('btn-confirm-wrap').style.display='block';
+}
+
+function confirmImport(){
+  if(!conflictMode){alert('請先選擇重複資料的處理方式');return;}
+  let added=0,overwritten=0,skipped=0;
+  parsedRows.forEach(r=>{
+    const existing=db.networks.find(n=>n.name===r.name&&n.area===r.area);
+    if(existing){
+      if(conflictMode==='overwrite'){ Object.assign(existing,{cat:r.cat,phone:r.phone,mobile:r.mobile,addr:r.addr}); overwritten++; }
+      else skipped++;
+    } else {
+      db.networks.push({id:uid(),cat:r.cat,area:r.area,name:r.name,sub:r.sub,phone:r.phone,mobile:r.mobile,addr:r.addr});
+      added++;
+    }
+  });
+  save(); populateFilters(); renderSearch();
+  const msg=[`新增 ${added} 筆`,overwritten?`覆蓋 ${overwritten} 筆`:'',skipped?`跳過 ${skipped} 筆`:''].filter(Boolean).join('、');
+  const result=document.getElementById('import-result');
+  result.textContent='✓ 匯入完成！'+msg;
+  result.style.display='block';
+  document.getElementById('btn-confirm-wrap').style.display='none';
+  parsedRows=[];
+  setTimeout(()=>{ result.style.display='none'; document.getElementById('import-text').value=''; resetImport(); },4000);
+}
+
 // ── 統計 ──
-function renderStats() {
+function renderStats(){
   const total=db.records.length,visits=db.records.filter(r=>r.type==='visit').length,recs=db.records.filter(r=>r.type==='rec').length;
   const workers=[...new Set(db.records.map(r=>r.worker).filter(Boolean))];
   const byW={};db.records.forEach(r=>{if(r.worker)byW[r.worker]=(byW[r.worker]||0)+1;});
   const wMax=Math.max(...Object.values(byW),1);
+  const byCat={};db.records.forEach(r=>{const net=db.networks.find(n=>n.id===r.nid);if(net&&net.cat)byCat[net.cat]=(byCat[net.cat]||0)+1;});
+  const cMax=Math.max(...Object.values(byCat),1);
   const byA={};db.records.forEach(r=>{const net=db.networks.find(n=>n.id===r.nid);if(net&&net.area)byA[net.area]=(byA[net.area]||0)+1;});
   const aMax=Math.max(...Object.values(byA),1);
   document.getElementById('stats-body').innerHTML=`
@@ -465,8 +697,8 @@ function renderStats() {
       <div class="stat"><div class="stat-n">${visits}</div><div class="stat-l">里長拜會</div></div>
       <div class="stat"><div class="stat-n">${recs}</div><div class="stat-l">合作記事</div></div>
       <div class="stat"><div class="stat-n">${workers.length}</div><div class="stat-l">參與社工人數</div></div>
-      <div class="stat"><div class="stat-n">${db.networks.filter(n=>n.type==='village').length}</div><div class="stat-l">里長網絡數</div></div>
-      <div class="stat"><div class="stat-n">${db.networks.filter(n=>n.type==='org').length}</div><div class="stat-l">資源單位數</div></div>
+      <div class="stat"><div class="stat-n">${db.networks.length}</div><div class="stat-l">資源單位總數</div></div>
+      <div class="stat"><div class="stat-n">${db.networks.filter(n=>n.cat==='里長').length}</div><div class="stat-l">里長數</div></div>
     </div>
     <div class="chart-wrap">
       <div class="chart-title">各社工互動次數</div>
@@ -475,54 +707,67 @@ function renderStats() {
       `).join('')||'<div class="empty">尚無資料</div>'}
     </div>
     <div class="chart-wrap">
+      <div class="chart-title">各單位別互動次數</div>
+      ${Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([a,c])=>`
+        <div class="bar-row"><div class="bar-label">${a}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(c/cMax*100)}%;background:var(--green);"></div></div><div class="bar-val">${c}</div></div>
+      `).join('')||'<div class="empty">尚無資料</div>'}
+    </div>
+    <div class="chart-wrap">
       <div class="chart-title">各地區互動次數</div>
       ${Object.entries(byA).sort((a,b)=>b[1]-a[1]).map(([a,c])=>`
-        <div class="bar-row"><div class="bar-label">${a}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(c/aMax*100)}%;background:var(--green);"></div></div><div class="bar-val">${c}</div></div>
+        <div class="bar-row"><div class="bar-label">${a}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(c/aMax*100)}%;background:var(--amber);"></div></div><div class="bar-val">${c}</div></div>
       `).join('')||'<div class="empty">尚無資料</div>'}
     </div>`;
 }
 
 // ── 管理 ──
-function renderMgmt() {
-  const nets=[...db.networks].sort((a,b)=>a.area.localeCompare(b.area));
+function renderMgmt(){
+  const nets=[...db.networks].sort((a,b)=>a.cat.localeCompare(b.cat)||a.area.localeCompare(b.area));
   const c=document.getElementById('mgmt-list');
-  if(!nets.length){c.innerHTML='<div class="empty">尚無網絡資料</div>';return;}
-  c.innerHTML=`<div class="hlist">${nets.map(n=>{
-    const isV=n.type==='village';
-    return `<div class="hitem" style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+  if(!nets.length){c.innerHTML='<div class="empty">尚無資源單位資料</div>';return;}
+  c.innerHTML=`<div class="hlist">${nets.map(n=>`
+    <div class="hitem" style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
       <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
-        <div class="ava ${isV?'ava-blue':'ava-green'}" style="width:30px;height:30px;font-size:11px;">${n.name.slice(-2)}</div>
+        <div class="ava ${catAva(n.cat)}" style="width:30px;height:30px;font-size:11px;">${n.name.slice(-2)}</div>
         <div>
-          <div style="font-weight:500;font-size:13px;">${n.name}${isV?' 里長':''} <span style="color:var(--hint);font-size:11px;">${n.area} ${n.sub}</span></div>
-          <div style="font-size:11px;color:var(--sub);">${[n.phone,n.mobile].filter(Boolean).join(' / ')}</div>
+          <div style="font-weight:500;font-size:13px;">${n.name} <span class="badge b-amber" style="font-size:10px;">${n.cat}</span></div>
+          <div style="font-size:11px;color:var(--sub);">${n.area}${n.sub?' · '+n.sub:''} ${[n.phone,n.mobile].filter(Boolean).join(' / ')}</div>
         </div>
       </div>
       <div style="display:flex;gap:6px;flex-shrink:0;">
-        <button class="btn btn-sm" onclick="openModal('${n.type}','${n.id}')">編輯</button>
+        <button class="btn btn-sm" onclick="openModal('${n.id}')">編輯</button>
         <button class="btn btn-sm" style="color:var(--red);border-color:var(--red);" onclick="delNet('${n.id}')">刪除</button>
       </div>
-    </div>`;
-  }).join('')}</div>`;
+    </div>`).join('')}</div>`;
 }
 
-function openModal(type, id) {
-  editId=id; modalType=type;
+// ── Modal 新增/編輯 ──
+function openModal(id){
+  editId=id;
   const net=id?db.networks.find(n=>n.id===id):null;
-  const isV=type==='village';
-  document.getElementById('modal-title').textContent=(id?(isV?'編輯里長':'編輯資源單位'):(isV?'新增里長':'新增資源單位'));
+  document.getElementById('modal-title').textContent=id?'編輯資源單位':'新增資源單位';
   const v=net||{};
+  const isOther=v.cat==='其他';
   document.getElementById('modal-body').innerHTML=`
     <div class="frow">
       <div class="fg"><label class="flabel">地區</label><input id="m-area" value="${v.area||''}" placeholder="例：蘆洲區"/></div>
-      <div class="fg"><label class="flabel">${isV?'里別':'類別'}</label><input id="m-sub" value="${v.sub||''}" placeholder="${isV?'例：永安里':'例：身心障礙服務'}"/></div>
+      <div class="fg"><label class="flabel">單位別</label>
+        <select id="m-cat" onchange="toggleOtherCat()">
+          ${UNIT_CATS.map(c=>`<option${v.cat===c?' selected':''}>${c}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="fg" id="m-other-wrap" style="margin-bottom:12px;display:${isOther?'flex':'none'};flex-direction:column;gap:4px;">
+      <label class="flabel">其他（請說明）</label>
+      <input id="m-cat-other" value="${isOther&&v.catOther?v.catOther:''}" placeholder="請填寫單位性質"/>
     </div>
     <div class="frow">
-      <div class="fg"><label class="flabel">${isV?'里長姓名':'單位名稱'}</label><input id="m-name" value="${v.name||''}" placeholder="${isV?'例：李建興':'例：蘆洲輔具中心'}"/></div>
+      <div class="fg"><label class="flabel">單位名稱</label><input id="m-name" value="${v.name||''}" placeholder="例：蘆洲輔具中心"/></div>
+      <div class="fg"><label class="flabel">備註／類別說明</label><input id="m-sub" value="${v.sub||''}" placeholder="例：身心障礙服務"/></div>
+    </div>
+    <div class="frow">
       <div class="fg"><label class="flabel">電話</label><input id="m-phone" value="${v.phone||''}" placeholder="02-xxxx-xxxx"/></div>
-    </div>
-    <div class="frow">
       <div class="fg"><label class="flabel">手機</label><input id="m-mobile" value="${v.mobile||''}" placeholder="09xx-xxx-xxx"/></div>
-      <div class="fg"></div>
     </div>
     <div class="frow full">
       <div class="fg"><label class="flabel">地址</label><input id="m-addr" value="${v.addr||''}" placeholder="通訊地址"/></div>
@@ -534,19 +779,22 @@ function openModal(type, id) {
   document.getElementById('modal').classList.add('on');
 }
 
-function saveNet() {
-  const name=gv('m-name').trim(),area=gv('m-area').trim();
-  if(!name||!area){alert('請填寫地區與名稱');return;}
-  if(editId) {
-    const net=db.networks.find(n=>n.id===editId);
-    Object.assign(net,{area,sub:gv('m-sub').trim(),name,phone:gv('m-phone').trim(),mobile:gv('m-mobile').trim(),addr:gv('m-addr').trim()});
-  } else {
-    db.networks.push({id:uid(),type:modalType,area,sub:gv('m-sub').trim(),name,phone:gv('m-phone').trim(),mobile:gv('m-mobile').trim(),addr:gv('m-addr').trim()});
-  }
-  save(); closeModal(); renderMgmt(); populateAreas();
+function toggleOtherCat(){
+  const isOther=gv('m-cat')==='其他';
+  document.getElementById('m-other-wrap').style.display=isOther?'flex':'none';
 }
 
-function delNet(id) {
+function saveNet(){
+  const name=gv('m-name').trim(),area=gv('m-area').trim(),cat=gv('m-cat');
+  if(!name||!area){alert('請填寫地區與名稱');return;}
+  const catOther=cat==='其他'?gv('m-cat-other').trim():'';
+  const data={area,cat,catOther,sub:gv('m-sub').trim(),name,phone:gv('m-phone').trim(),mobile:gv('m-mobile').trim(),addr:gv('m-addr').trim()};
+  if(editId){ Object.assign(db.networks.find(n=>n.id===editId),data); }
+  else { db.networks.push({id:uid(),...data}); }
+  save(); closeModal(); renderMgmt(); populateFilters();
+}
+
+function delNet(id){
   if(!confirm('確定要刪除？相關互動記錄不會一併刪除。')) return;
   db.networks=db.networks.filter(n=>n.id!==id);
   save(); renderMgmt(); renderSearch();
@@ -556,10 +804,10 @@ function closeModal(){ document.getElementById('modal').classList.remove('on'); 
 
 // ── 初始化 ──
 load();
-populateAreas();
+populateFilters();
 renderSearch();
-updateNetSel('rc');
-updateVisitSel();
+initRecForm();
+initVisitForm();
 ['rc-date','vi-date'].forEach(id=>{ const el=document.getElementById(id);if(el)el.value=todayStr(); });
 </script>
 </body>
