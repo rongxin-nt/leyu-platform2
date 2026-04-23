@@ -502,12 +502,12 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
 
 <script>
 // ══════════════════════════════
-// ★ 督導密碼設定區 ★
-// 請把下面的 leyu2024 改成你想要的密碼
+// ★ 設定區 ★
 const SUPER_PASSWORD = '72965262';
+const SB_URL = 'https://niumokiwqeltnjsmbpud.supabase.co';
+const SB_KEY = 'sb_publishable_l-WTIo_sUuUv3vwFNXFhjA_n4e40L37';
 // ══════════════════════════════
 
-const STORAGE_KEY = 'leyu_db_v2';
 const UNIT_CATS = ['里長','社政單位','衛政單位','長照單位','勞政單位','警政單位','司法單位','民間資源','其他'];
 
 let db = {networks:[], records:[]};
@@ -517,31 +517,100 @@ let parsedRows = [];
 let conflictMode = null;
 let isSuperMode = false;
 
-// ── 儲存 ──
-function save(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); }catch(e){} }
-function load(){
+// ── Supabase API ──
+async function sbFetch(table, method='GET', body=null, query=''){
+  const res = await fetch(`${SB_URL}/rest/v1/${table}${query}`, {
+    method,
+    headers:{
+      'apikey': SB_KEY,
+      'Authorization': `Bearer ${SB_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': method==='POST' ? 'return=representation' : (method==='PATCH'||method==='DELETE' ? 'return=minimal' : ''),
+    },
+    body: body ? JSON.stringify(body) : null,
+  });
+  if(!res.ok){
+    const err = await res.text();
+    throw new Error(err);
+  }
+  if(method==='DELETE'||res.status===204) return null;
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+// ── 讀取所有資料 ──
+async function loadFromDB(){
+  showLoading(true);
   try{
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if(raw){ db = JSON.parse(raw); return; }
-  }catch(e){}
-  db = {
-    networks:[
-      {id:'n1',cat:'里長',area:'蘆洲區',name:'李建興',sub:'永安里',phone:'02-2288-5918',mobile:'0928-201-526',addr:'新北市蘆洲區永安南路二段16巷9號3樓'},
-      {id:'n2',cat:'里長',area:'蘆洲區',name:'何唯菁',sub:'仁復里',phone:'02-8281-5221',mobile:'0978-341-379',addr:'新北市蘆洲區得勝街69巷16號1樓'},
-      {id:'n3',cat:'里長',area:'蘆洲區',name:'何益銘',sub:'仁義里',phone:'02-2289-1048',mobile:'0963-978-335',addr:'新北市蘆洲區信義路192號1樓'},
-      {id:'n4',cat:'里長',area:'八里區',name:'林俊德',sub:'龍源里',phone:'',mobile:'',addr:'八里區龍源里'},
-      {id:'n5',cat:'里長',area:'五股區',name:'潘明宏',sub:'成泰里',phone:'',mobile:'',addr:'五股區成泰里'},
-      {id:'n6',cat:'公部門',area:'新北市',name:'新北市社會局',sub:'社政資源',phone:'02-2960-3456',mobile:'',addr:'新北市板橋區'},
-      {id:'n7',cat:'長照單位',area:'蘆洲區',name:'蘆洲區輔具中心',sub:'身心障礙服務',phone:'02-2281-0000',mobile:'',addr:'新北市蘆洲區'},
-    ],
-    records:[
-      {id:'r1',type:'rec',nid:'n1',worker:'張素嬌',date:'2026/04/02',method:'',content:'里長很客氣，提供仁復里發展協會送餐資訊，可協助午餐1餐。'},
-      {id:'r2',type:'visit',nid:'n2',worker:'廖珮君',date:'2026/04/10',method:'親自拜訪',content:'里長表示了解服務內容，社工留存中心文宣資料。'},
-      {id:'r3',type:'rec',nid:'n4',worker:'蕭鐺霖',date:'2025/10/15',method:'',content:'里長說要行文才能協助找人，需再次說明服務。'},
-      {id:'r4',type:'visit',nid:'n3',worker:'張素嬌',date:'2026/04/14',method:'電話聯繫',content:'里長說輔具中心不協助回收舊電動床，會找議員反應。'},
-    ]
-  };
-  save();
+    const [nets, recs] = await Promise.all([
+      sbFetch('networks', 'GET', null, '?select=*&order=name'),
+      sbFetch('records', 'GET', null, '?select=*&order=date.desc'),
+    ]);
+    db.networks = (nets||[]).map(n=>({
+      id:n.id, cat:n.cat||'', area:n.area||'', name:n.name||'',
+      sub:n.sub||'', catOther:n.cat_other||'', phone:n.phone||'',
+      mobile:n.mobile||'', addr:n.addr||'', noteWorker:n.note_worker||''
+    }));
+    db.records = (recs||[]).map(r=>({
+      id:r.id, type:r.type||'rec', nid:r.nid||'',
+      worker:r.worker||'', date:r.date||'', method:r.method||'', content:r.content||''
+    }));
+  }catch(e){ console.error('載入失敗',e); alert('資料載入失敗，請重新整理頁面'); }
+  showLoading(false);
+}
+
+// ── 新增資源單位 ──
+async function dbAddNetwork(d){
+  const row = {id:d.id,cat:d.cat,area:d.area,name:d.name,sub:d.sub,cat_other:d.catOther,phone:d.phone,mobile:d.mobile,addr:d.addr,note_worker:d.noteWorker};
+  await sbFetch('networks','POST',row);
+}
+
+// ── 更新資源單位 ──
+async function dbUpdateNetwork(id, d){
+  const row = {cat:d.cat,area:d.area,name:d.name,sub:d.sub,cat_other:d.catOther,phone:d.phone,mobile:d.mobile,addr:d.addr,note_worker:d.noteWorker};
+  await sbFetch('networks','PATCH',row,`?id=eq.${id}`);
+}
+
+// ── 刪除資源單位 ──
+async function dbDeleteNetwork(id){
+  await sbFetch('networks','DELETE',null,`?id=eq.${id}`);
+}
+
+// ── 新增互動記錄 ──
+async function dbAddRecord(d){
+  const row = {id:d.id,type:d.type,nid:d.nid,worker:d.worker,date:d.date,method:d.method,content:d.content};
+  await sbFetch('records','POST',row);
+}
+
+// ── 更新互動記錄社工 ──
+async function dbUpdateRecordWorker(id, worker){
+  await sbFetch('records','PATCH',{worker},`?id=eq.${id}`);
+}
+
+// ── 刪除互動記錄 ──
+async function dbDeleteRecord(id){
+  await sbFetch('records','DELETE',null,`?id=eq.${id}`);
+}
+
+// ── 批次新增資源單位 ──
+async function dbBatchNetworks(rows, mode){
+  let added=0, overwritten=0, skipped=0;
+  for(const r of rows){
+    const existing = db.networks.find(n=>n.name===r.name&&n.area===r.area);
+    if(existing){
+      if(mode==='overwrite'){
+        await dbUpdateNetwork(existing.id, {...existing, ...r});
+        Object.assign(existing, r);
+        overwritten++;
+      } else skipped++;
+    } else {
+      r.id = r.id || uid();
+      await dbAddNetwork(r);
+      db.networks.push(r);
+      added++;
+    }
+  }
+  return {added, overwritten, skipped};
 }
 
 function uid(){ return 'x'+Math.random().toString(36).slice(2,9); }
@@ -898,29 +967,22 @@ function checkAddDup(){
   }
 }
 
-function submitAdd(){
-  const area   = gv('add-area').trim();
-  const cat    = gv('add-cat');
-  const name   = gv('add-name').trim();
-  const phone  = gv('add-phone').trim();
-  const mobile = gv('add-mobile').trim();
-  const addr   = gv('add-addr').trim();
-  const noteWorker = gv('add-note-worker').trim();
-  const sub    = cat==='里長' ? gv('add-sub-village').trim() : '';
-  const catOther = cat==='其他' ? gv('add-cat-other').trim() : '';
-
-  if(!area){ alert('請填寫地區'); return; }
-  if(!cat){  alert('請選擇單位別'); return; }
-  if(cat==='里長' && !sub){ alert('請填寫里別'); return; }
-  if(cat==='其他' && !catOther){ alert('請填寫其他說明'); return; }
-  if(!name){ alert('請填寫單位名稱'); return; }
-
-  db.networks.push({ id:uid(), area, cat, sub, catOther, name, phone, mobile, addr, noteWorker });
-  save();
-  populateFilters();
-  renderSearch();
-  showToast('add-ok');
-  clearAdd();
+async function submitAdd(){
+  const area=gv('add-area').trim(),cat=gv('add-cat'),name=gv('add-name').trim();
+  const phone=gv('add-phone').trim(),mobile=gv('add-mobile').trim(),addr=gv('add-addr').trim();
+  const noteWorker=gv('add-note-worker').trim();
+  const sub=cat==='里長'?gv('add-sub-village').trim():'';
+  const catOther=cat==='其他'?gv('add-cat-other').trim():'';
+  if(!area){alert('請填寫地區');return;}
+  if(!cat){alert('請選擇單位別');return;}
+  if(cat==='里長'&&!sub){alert('請填寫里別');return;}
+  if(cat==='其他'&&!catOther){alert('請填寫其他說明');return;}
+  if(!name){alert('請填寫單位名稱');return;}
+  showLoading(true);
+  const d={id:uid(),area,cat,sub,catOther,name,phone,mobile,addr,noteWorker};
+  try{ await dbAddNetwork(d); db.networks.push(d); populateFilters(); renderSearch(); showToast('add-ok'); clearAdd(); }
+  catch(e){ alert('新增失敗：'+e.message); }
+  showLoading(false);
 }
 
 function clearAdd(){
@@ -947,33 +1009,35 @@ function updateNetSel(p){
   clearSS(p);
 }
 
-function submitRec(){
+async function submitRec(){
   const worker=gv('rc-worker').trim(),content=gv('rc-content').trim(),nid=document.getElementById('rc-net').value;
   if(!worker){alert('請填寫社工姓名');return;}
   if(!nid){alert('請選擇資源單位');return;}
   if(!content){alert('請填寫互動內容');return;}
-  db.records.unshift({id:uid(),type:'rec',nid,worker,date:fmt(gv('rc-date'))||fmt(todayStr()),method:'',content});
-  save(); populateFilters(); showToast('rc-ok'); clearF('rc');
+  showLoading(true);
+  const d={id:uid(),type:'rec',nid,worker,date:fmt(gv('rc-date'))||fmt(todayStr()),method:'',content};
+  try{ await dbAddRecord(d); db.records.unshift(d); populateFilters(); showToast('rc-ok'); clearF('rc'); }
+  catch(e){ alert('送出失敗：'+e.message); }
+  showLoading(false);
 }
 
 // ── 里長拜會表單 ──
 function initVisitForm(){
   const nets=sortByStroke(db.networks.filter(n=>n.cat==='里長'),'name');
-  const items=nets.map(n=>({
-    val:n.id,
-    label:`${n.area} ${n.sub||''} ${n.name}`.replace(/\s+/g,' ').trim()
-  }));
-  buildSS('vi',items);
-  clearSS('vi');
+  const items=nets.map(n=>({val:n.id,label:`${n.area} ${n.sub||''} ${n.name}`.replace(/\s+/g,' ').trim()}));
+  buildSS('vi',items); clearSS('vi');
 }
 
-function submitVisit(){
+async function submitVisit(){
   const worker=gv('vi-worker').trim(),content=gv('vi-content').trim(),nid=document.getElementById('vi-net').value;
   if(!worker){alert('請填寫社工姓名');return;}
   if(!nid){alert('請選擇里長');return;}
   if(!content){alert('請填寫拜會狀況');return;}
-  db.records.unshift({id:uid(),type:'visit',nid,worker,date:fmt(gv('vi-date'))||fmt(todayStr()),method:gv('vi-method'),content});
-  save(); populateFilters(); showToast('vi-ok'); clearF('vi');
+  showLoading(true);
+  const d={id:uid(),type:'visit',nid,worker,date:fmt(gv('vi-date'))||fmt(todayStr()),method:gv('vi-method'),content};
+  try{ await dbAddRecord(d); db.records.unshift(d); populateFilters(); showToast('vi-ok'); clearF('vi'); }
+  catch(e){ alert('送出失敗：'+e.message); }
+  showLoading(false);
 }
 
 function clearF(p){
@@ -1060,27 +1124,19 @@ function setConflict(mode){
   document.getElementById('btn-confirm-wrap').style.display='block';
 }
 
-function confirmImport(){
+async function confirmImport(){
   if(!conflictMode){alert('請先選擇重複資料的處理方式');return;}
-  let added=0,overwritten=0,skipped=0;
-  parsedRows.forEach(r=>{
-    const existing=db.networks.find(n=>n.name===r.name&&n.area===r.area);
-    if(existing){
-      if(conflictMode==='overwrite'){ Object.assign(existing,{cat:r.cat,sub:r.sub,catOther:r.catOther,phone:r.phone,mobile:r.mobile,addr:r.addr}); overwritten++; }
-      else skipped++;
-    } else {
-      db.networks.push({id:uid(),cat:r.cat,area:r.area,name:r.name,sub:r.sub,catOther:r.catOther,phone:r.phone,mobile:r.mobile,addr:r.addr});
-      added++;
-    }
-  });
-  save(); populateFilters(); renderSearch();
-  const msg=[`新增 ${added} 筆`,overwritten?`覆蓋 ${overwritten} 筆`:'',skipped?`跳過 ${skipped} 筆`:''].filter(Boolean).join('、');
-  const result=document.getElementById('import-result');
-  result.textContent='✓ 匯入完成！'+msg;
-  result.style.display='block';
-  document.getElementById('btn-confirm-wrap').style.display='none';
-  parsedRows=[];
-  setTimeout(()=>{ result.style.display='none'; document.getElementById('import-text').value=''; resetImport(); },4000);
+  showLoading(true);
+  try{
+    const {added,overwritten,skipped} = await dbBatchNetworks(parsedRows, conflictMode);
+    populateFilters(); renderSearch();
+    const msg=[`新增 ${added} 筆`,overwritten?`覆蓋 ${overwritten} 筆`:'',skipped?`跳過 ${skipped} 筆`:''].filter(Boolean).join('、');
+    const result=document.getElementById('import-result');
+    result.textContent='✓ 匯入完成！'+msg; result.style.display='block';
+    document.getElementById('btn-confirm-wrap').style.display='none'; parsedRows=[];
+    setTimeout(()=>{ result.style.display='none'; document.getElementById('import-text').value=''; resetImport(); },4000);
+  }catch(e){ alert('匯入失敗：'+e.message); }
+  showLoading(false);
 }
 
 // ── 統計 ──
@@ -1311,18 +1367,6 @@ function renderMgmtPagination(total,totalPages){
 function goMgmtPage(p){ mgmtPage=p; renderMgmt(); document.getElementById('p-mgmt').scrollTop=0; }
 
 // ── 編輯互動記錄社工姓名 ──
-function editRecWorker(rid, currentWorker){
-  const newWorker = prompt('請輸入新的社工姓名：', currentWorker);
-  if(newWorker === null) return; // 取消
-  const rec = db.records.find(r=>r.id===rid);
-  if(rec){
-    rec.worker = newWorker.trim();
-    save();
-    populateFilters();
-    renderMgmt();
-  }
-}
-
 // ── Modal 新增/編輯 ──
 function openModal(id){
   editId=id;
@@ -1369,25 +1413,43 @@ function toggleOtherCat(){
   document.getElementById('m-other-wrap').style.display=isOther?'flex':'none';
 }
 
-function saveNet(){
+async function saveNet(){
   const name=gv('m-name').trim(),area=gv('m-area').trim(),cat=gv('m-cat');
   if(!name||!area){alert('請填寫地區與名稱');return;}
   const catOther=cat==='其他'?gv('m-cat-other').trim():'';
   const data={area,cat,catOther,sub:gv('m-sub').trim(),name,phone:gv('m-phone').trim(),mobile:gv('m-mobile').trim(),addr:gv('m-addr').trim(),noteWorker:gv('m-note-worker').trim()};
-  if(editId){ Object.assign(db.networks.find(n=>n.id===editId),data); }
-  else { db.networks.push({id:uid(),...data}); }
-  save(); closeModal(); renderMgmt(); populateFilters();
+  showLoading(true);
+  try{
+    if(editId){ await dbUpdateNetwork(editId,data); Object.assign(db.networks.find(n=>n.id===editId),data); }
+    else { const d={id:uid(),...data}; await dbAddNetwork(d); db.networks.push(d); }
+    closeModal(); renderMgmt(); populateFilters();
+  }catch(e){ alert('儲存失敗：'+e.message); }
+  showLoading(false);
 }
 
-function delNet(id){
+async function delNet(id){
   if(!confirm('確定要刪除？相關互動記錄不會一併刪除。')) return;
-  db.networks=db.networks.filter(n=>n.id!==id);
-  save(); renderMgmt(); renderSearch();
+  showLoading(true);
+  try{ await dbDeleteNetwork(id); db.networks=db.networks.filter(n=>n.id!==id); renderMgmt(); renderSearch(); }
+  catch(e){ alert('刪除失敗：'+e.message); }
+  showLoading(false);
 }
 
 function closeModal(){ document.getElementById('modal').classList.remove('on'); }
 
-// ── 地圖 ──
+// ── 編輯互動記錄社工姓名 ──
+async function editRecWorker(rid, currentWorker){
+  const newWorker=prompt('請輸入新的社工姓名：',currentWorker);
+  if(newWorker===null) return;
+  showLoading(true);
+  try{
+    await dbUpdateRecordWorker(rid, newWorker.trim());
+    const rec=db.records.find(r=>r.id===rid);
+    if(rec) rec.worker=newWorker.trim();
+    populateFilters(); renderMgmt();
+  }catch(e){ alert('修改失敗：'+e.message); }
+  showLoading(false);
+}
 const GMAPS_KEY = 'AIzaSyCpc7FHkOiXZw6oNSbgkJrlXjoHNN1VcqQ';
 const GEO_CACHE_KEY = 'leyu_geocache_v1';
 const CAT_COLORS = {
@@ -1585,13 +1647,24 @@ function initMapPage(){
   }
 }
 
+// ── Loading ──
+function showLoading(on){
+  const el=document.getElementById('loading-overlay');
+  if(el) el.classList.toggle('on',on);
+}
+
 // ── 初始化 ──
-load();
-populateFilters();
-renderSearch();
-initRecForm();
-initVisitForm();
-['rc-date','vi-date'].forEach(id=>{ const el=document.getElementById(id);if(el)el.value=todayStr(); });
+async function init(){
+  showLoading(true);
+  await loadFromDB();
+  showLoading(false);
+  populateFilters();
+  renderSearch();
+  initRecForm();
+  initVisitForm();
+  ['rc-date','vi-date'].forEach(id=>{ const el=document.getElementById(id);if(el)el.value=todayStr(); });
+}
+init();
 </script>
 </body>
 </html>
