@@ -109,6 +109,25 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
 .empty{text-align:center;padding:2.5rem;color:var(--hint);font-size:13px;}
 .action-bar{display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;}
 
+/* 搜尋式下拉 */
+.searchable-select{position:relative;width:100%;}
+.searchable-select input{width:100%;height:36px;border:1px solid var(--border2);border-radius:var(--r);background:var(--surface);color:var(--text);font-family:inherit;font-size:13px;padding:0 10px;outline:none;}
+.searchable-select input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,95,168,.08);}
+.ss-dropdown{display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border2);border-radius:var(--r);max-height:220px;overflow-y:auto;z-index:100;margin-top:2px;box-shadow:0 4px 12px rgba(0,0,0,.1);}
+.ss-dropdown.on{display:block;}
+.ss-option{padding:8px 12px;font-size:13px;cursor:pointer;transition:background .1s;}
+.ss-option:hover{background:var(--blue-l);color:var(--blue-d);}
+.ss-option.selected{background:var(--blue-l);color:var(--blue-d);font-weight:500;}
+.ss-empty{padding:10px 12px;font-size:12px;color:var(--hint);}
+
+/* 分頁 */
+.pagination{display:flex;align-items:center;gap:6px;margin-top:1rem;flex-wrap:wrap;}
+.pg-btn{height:30px;padding:0 10px;border:1px solid var(--border2);border-radius:var(--r);background:var(--surface);color:var(--sub);font-family:inherit;font-size:12px;cursor:pointer;transition:all .12s;}
+.pg-btn:hover{border-color:var(--blue);color:var(--blue);}
+.pg-btn.on{background:var(--blue);color:#fff;border-color:var(--blue);font-weight:500;}
+.pg-btn:disabled{opacity:.4;cursor:default;}
+.pg-info{font-size:12px;color:var(--hint);padding:0 4px;}
+
 /* 查詢表格 */
 .net-table{width:100%;border-collapse:collapse;background:var(--surface);border-radius:var(--rl);overflow:hidden;border:1px solid var(--border);}
 .net-table thead tr{background:var(--bg);}
@@ -171,6 +190,7 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
         </div>
         <div class="rmeta" id="s-meta"></div>
         <div id="s-list"></div>
+        <div class="pagination" id="s-pagination"></div>
       </div>
 
       <!-- 歷史 -->
@@ -208,7 +228,12 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
               </select>
             </div>
             <div class="fg"><label class="flabel">選擇資源單位</label>
-              <select id="rc-net"></select>
+              <div class="searchable-select" id="rc-net-wrap">
+                <input type="text" id="rc-net-search" placeholder="輸入關鍵字搜尋或直接選擇..." autocomplete="off"
+                  oninput="filterSS('rc')" onfocus="openSS('rc')" onblur="setTimeout(()=>closeSS('rc'),180)"/>
+                <input type="hidden" id="rc-net"/>
+                <div class="ss-dropdown" id="rc-net-dd"></div>
+              </div>
             </div>
           </div>
           <div class="frow full">
@@ -234,7 +259,14 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
             <div class="fg"><label class="flabel">拜會日期</label><input type="date" id="vi-date"/></div>
           </div>
           <div class="frow">
-            <div class="fg"><label class="flabel">選擇里長</label><select id="vi-net"></select></div>
+            <div class="fg"><label class="flabel">選擇里長</label>
+              <div class="searchable-select" id="vi-net-wrap">
+                <input type="text" id="vi-net-search" placeholder="輸入關鍵字搜尋或直接選擇..." autocomplete="off"
+                  oninput="filterSS('vi')" onfocus="openSS('vi')" onblur="setTimeout(()=>closeSS('vi'),180)"/>
+                <input type="hidden" id="vi-net"/>
+                <div class="ss-dropdown" id="vi-net-dd"></div>
+              </div>
+            </div>
             <div class="fg"><label class="flabel">互動方式</label>
               <select id="vi-method">
                 <option>親自拜訪</option><option>電話聯繫</option><option>LINE訊息</option><option>其他</option>
@@ -269,10 +301,13 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
               <select id="add-cat" onchange="toggleAddCatFields()">
                 <option value="">請選擇...</option>
                 <option>里長</option>
-                <option>公部門</option>
-                <option>民間單位</option>
+                <option>社政單位</option>
+                <option>衛政單位</option>
                 <option>長照單位</option>
                 <option>勞政單位</option>
+                <option>警政單位</option>
+                <option>司法單位</option>
+                <option>民間資源</option>
                 <option>其他</option>
               </select>
             </div>
@@ -424,7 +459,7 @@ const SUPER_PASSWORD = 'leyu2024';
 // ══════════════════════════════
 
 const STORAGE_KEY = 'leyu_db_v2';
-const UNIT_CATS = ['里長','公部門','民間單位','長照單位','勞政單位','其他'];
+const UNIT_CATS = ['里長','社政單位','衛政單位','長照單位','勞政單位','警政單位','司法單位','民間資源','其他'];
 
 let db = {networks:[], records:[]};
 let curNT = 'all';
@@ -467,8 +502,9 @@ function gv(id){ return (document.getElementById(id)||{}).value||''; }
 
 // ── 單位別顏色 ──
 const CAT_AVA = {
-  '里長':'ava-blue','公部門':'ava-green','民間單位':'ava-amber',
-  '長照單位':'ava-blue','勞政單位':'ava-green','其他':'ava-amber'
+  '里長':'ava-blue','社政單位':'ava-green','衛政單位':'ava-green',
+  '長照單位':'ava-blue','勞政單位':'ava-green','警政單位':'ava-amber',
+  '司法單位':'ava-amber','民間資源':'ava-amber','其他':'ava-amber'
 };
 function catAva(cat){ return CAT_AVA[cat]||'ava-blue'; }
 
@@ -553,25 +589,37 @@ function populateFilters(){
   if(rccat){ const cur=rccat.value; while(rccat.options.length>1) rccat.remove(1); UNIT_CATS.forEach(c=>rccat.add(new Option(c,c))); rccat.value=cur; }
 }
 
-// ── 查詢 ──
+// ── 查詢（含分頁）──
+let searchPage = 1;
+const PAGE_SIZE = 20;
+let filteredNets = [];
+
 function setNT(t,el){
   curNT=t;
   document.querySelectorAll('#cat-filter-bar .ttype').forEach(x=>x.classList.remove('on'));
   el.classList.add('on');
+  searchPage=1;
   renderSearch();
 }
 
 function renderSearch(){
+  searchPage = searchPage||1;
   const area=gv('s-area'),kw=gv('s-kw').toLowerCase();
-  const nets=db.networks.filter(n=>{
+  filteredNets=db.networks.filter(n=>{
     if(curNT!=='all'&&n.cat!==curNT) return false;
     if(area&&n.area!==area) return false;
     if(kw&&!(n.name.toLowerCase().includes(kw)||(n.sub||'').toLowerCase().includes(kw)||(n.area||'').toLowerCase().includes(kw))) return false;
     return true;
   });
-  document.getElementById('s-meta').textContent=`共 ${nets.length} 筆，點擊列可展開詳細資料`;
+  const total=filteredNets.length;
+  const totalPages=Math.max(1,Math.ceil(total/PAGE_SIZE));
+  if(searchPage>totalPages) searchPage=totalPages;
+  const start=(searchPage-1)*PAGE_SIZE;
+  const pageNets=filteredNets.slice(start,start+PAGE_SIZE);
+
+  document.getElementById('s-meta').textContent=`共 ${total} 筆，點擊列可展開詳細資料`;
   const c=document.getElementById('s-list');
-  if(!nets.length){c.innerHTML='<div class="empty">找不到符合的資源單位</div>';return;}
+  if(!pageNets.length){c.innerHTML='<div class="empty">找不到符合的資源單位</div>';renderPagination(0,1);return;}
   c.innerHTML=`<table class="net-table">
     <thead><tr>
       <th style="width:36px"></th>
@@ -582,12 +630,11 @@ function renderSearch(){
       <th>電話</th>
       <th>互動次數</th>
     </tr></thead>
-    <tbody>${nets.map(n=>{
+    <tbody>${pageNets.map(n=>{
       const cnt=db.records.filter(r=>r.nid===n.id).length;
-      const subLabel = n.cat==='其他'&&n.catOther ? n.catOther : (n.sub||'');
-      const rid='row-'+n.id;
+      const subLabel=n.cat==='其他'&&n.catOther?n.catOther:(n.sub||'');
       return `
-        <tr onclick="toggleRow('${n.id}')" id="${rid}">
+        <tr onclick="toggleRow('${n.id}')" id="row-${n.id}">
           <td style="text-align:center;color:var(--hint);font-size:11px;" id="arrow-${n.id}">▶</td>
           <td style="font-weight:500;">${n.name}</td>
           <td><span class="badge b-amber">${n.cat}</span></td>
@@ -614,6 +661,31 @@ function renderSearch(){
     }).join('')}
     </tbody>
   </table>`;
+  renderPagination(total,totalPages);
+}
+
+function renderPagination(total,totalPages){
+  const pg=document.getElementById('s-pagination');
+  if(!pg||totalPages<=1){if(pg)pg.innerHTML='';return;}
+  let html=`<button class="pg-btn" onclick="goPage(${searchPage-1})" ${searchPage<=1?'disabled':''}>‹ 上一頁</button>`;
+  const range=[];
+  for(let i=1;i<=totalPages;i++){
+    if(i===1||i===totalPages||Math.abs(i-searchPage)<=2) range.push(i);
+    else if(range[range.length-1]!=='...') range.push('...');
+  }
+  range.forEach(p=>{
+    if(p==='...') html+=`<span class="pg-info">…</span>`;
+    else html+=`<button class="pg-btn ${p===searchPage?'on':''}" onclick="goPage(${p})">${p}</button>`;
+  });
+  html+=`<button class="pg-btn" onclick="goPage(${searchPage+1})" ${searchPage>=totalPages?'disabled':''}>下一頁 ›</button>`;
+  html+=`<span class="pg-info">第 ${searchPage}/${totalPages} 頁，共 ${total} 筆</span>`;
+  pg.innerHTML=html;
+}
+
+function goPage(p){
+  searchPage=p;
+  renderSearch();
+  document.getElementById('p-search').scrollTop=0;
 }
 
 function toggleRow(id){
@@ -624,12 +696,66 @@ function toggleRow(id){
   arrow.textContent=isOn?'▶':'▼';
 }
 
-function jumpHist(nid,name){ go('hist'); document.getElementById('h-kw').value=name; renderHist(); }
+// ── 搜尋式下拉（SS）──
+let ssData = { rc:[], vi:[] };
+
+function buildSS(prefix, items){
+  ssData[prefix]=items;
+  renderSS(prefix,'');
+}
+
+function renderSS(prefix,kw){
+  const dd=document.getElementById(prefix+'-net-dd');
+  const filtered=kw ? ssData[prefix].filter(i=>i.label.toLowerCase().includes(kw.toLowerCase())) : ssData[prefix];
+  if(!filtered.length){dd.innerHTML='<div class="ss-empty">找不到符合的項目</div>';return;}
+  const curVal=document.getElementById(prefix+'-net').value;
+  dd.innerHTML=filtered.map(i=>`<div class="ss-option ${i.val===curVal?'selected':''}" onmousedown="setSS('${prefix}','${i.val}','${i.label.replace(/'/g,'')}')">${i.label}</div>`).join('');
+}
+
+function filterSS(prefix){
+  const kw=document.getElementById(prefix+'-net-search').value;
+  renderSS(prefix,kw);
+  openSS(prefix);
+  // 清空選擇
+  document.getElementById(prefix+'-net').value='';
+}
+
+function openSS(prefix){
+  document.getElementById(prefix+'-net-dd').classList.add('on');
+  renderSS(prefix, document.getElementById(prefix+'-net-search').value);
+}
+
+function closeSS(prefix){
+  document.getElementById(prefix+'-net-dd').classList.remove('on');
+  // 若沒有選擇值，清空搜尋框
+  if(!document.getElementById(prefix+'-net').value){
+    document.getElementById(prefix+'-net-search').value='';
+  }
+}
+
+function setSS(prefix,val,label){
+  document.getElementById(prefix+'-net').value=val;
+  document.getElementById(prefix+'-net-search').value=label||ssData[prefix].find(i=>i.val===val)?.label||'';
+  document.getElementById(prefix+'-net-dd').classList.remove('on');
+  renderSS(prefix,'');
+}
+
+function clearSS(prefix){
+  document.getElementById(prefix+'-net').value='';
+  document.getElementById(prefix+'-net-search').value='';
+  renderSS(prefix,'');
+}
+
+function jumpHist(nid,name){
+  ['h-area','h-cat','h-type','h-worker'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('h-kw').value=name;
+  go('hist');
+}
 function quickRec(nid,cat){
   go('rec');
   document.getElementById('rc-cat').value=cat;
   updateNetSel('rc');
-  setTimeout(()=>{ document.getElementById('rc-net').value=nid; },50);
+  setTimeout(()=>{ setSS('rc',nid); },80);
 }
 
 // ── 歷史 ──
@@ -656,7 +782,6 @@ function renderHist(){
         <span class="badge ${bClass}">${r.type==='visit'?'里長拜會':'合作記事'}</span>
         ${net.cat?`<span class="badge b-amber">${net.cat}</span>`:''}
         <span class="hwho">${net.area} ${net.sub||''} ${net.name}</span>
-        ${r.worker?`<span class="hwho">社工：${r.worker}</span>`:''}
         ${r.method?`<span class="hwho">${r.method}</span>`:''}
         ${r.date?`<span class="hdate">${r.date}</span>`:''}
       </div>
@@ -727,15 +852,16 @@ function initRecForm(){ populateFilters(); updateNetSel('rc'); }
 
 function updateNetSel(p){
   const cat=gv(p+'-cat');
-  const sel=document.getElementById(p+'-net');
-  sel.innerHTML='<option value="">請選擇...</option>';
-  db.networks.filter(n=>!cat||n.cat===cat).forEach(n=>
-    sel.add(new Option(`[${n.cat}] ${n.area} ${n.sub||''} ${n.name}`,n.id))
-  );
+  const items=db.networks.filter(n=>!cat||n.cat===cat).map(n=>({
+    val:n.id,
+    label:`[${n.cat}] ${n.area} ${n.sub||''} ${n.name}`.replace(/\s+/g,' ').trim()
+  }));
+  buildSS(p,items);
+  clearSS(p);
 }
 
 function submitRec(){
-  const worker=gv('rc-worker').trim(),content=gv('rc-content').trim(),nid=gv('rc-net');
+  const worker=gv('rc-worker').trim(),content=gv('rc-content').trim(),nid=document.getElementById('rc-net').value;
   if(!worker){alert('請填寫社工姓名');return;}
   if(!nid){alert('請選擇資源單位');return;}
   if(!content){alert('請填寫互動內容');return;}
@@ -745,15 +871,16 @@ function submitRec(){
 
 // ── 里長拜會表單 ──
 function initVisitForm(){
-  const sel=document.getElementById('vi-net');
-  sel.innerHTML='<option value="">請選擇...</option>';
-  db.networks.filter(n=>n.cat==='里長').forEach(n=>
-    sel.add(new Option(`${n.area} ${n.sub||''} ${n.name}`,n.id))
-  );
+  const items=db.networks.filter(n=>n.cat==='里長').map(n=>({
+    val:n.id,
+    label:`${n.area} ${n.sub||''} ${n.name}`.replace(/\s+/g,' ').trim()
+  }));
+  buildSS('vi',items);
+  clearSS('vi');
 }
 
 function submitVisit(){
-  const worker=gv('vi-worker').trim(),content=gv('vi-content').trim(),nid=gv('vi-net');
+  const worker=gv('vi-worker').trim(),content=gv('vi-content').trim(),nid=document.getElementById('vi-net').value;
   if(!worker){alert('請填寫社工姓名');return;}
   if(!nid){alert('請選擇里長');return;}
   if(!content){alert('請填寫拜會狀況');return;}
@@ -764,7 +891,7 @@ function submitVisit(){
 function clearF(p){
   ['worker','content'].forEach(f=>{const el=document.getElementById(p+'-'+f);if(el)el.value='';});
   const d=document.getElementById(p+'-date');if(d)d.value=todayStr();
-  const n=document.getElementById(p+'-net');if(n)n.value='';
+  clearSS(p);
 }
 
 function showToast(id){ const el=document.getElementById(id);el.style.display='flex';setTimeout(()=>{el.style.display='none';},4000); }
@@ -912,20 +1039,31 @@ function renderMgmt(){
   const nets=[...db.networks].sort((a,b)=>a.cat.localeCompare(b.cat)||a.area.localeCompare(b.area));
   const c=document.getElementById('mgmt-list');
   if(!nets.length){c.innerHTML='<div class="empty">尚無資源單位資料</div>';return;}
-  c.innerHTML=`<div class="hlist">${nets.map(n=>`
-    <div class="hitem" style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
-      <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
-        <div class="ava ${catAva(n.cat)}" style="width:30px;height:30px;font-size:11px;">${n.name.slice(-2)}</div>
-        <div>
-          <div style="font-weight:500;font-size:13px;">${n.name} <span class="badge b-amber" style="font-size:10px;">${n.cat}</span></div>
-          <div style="font-size:11px;color:var(--sub);">${n.area}${n.sub?' · '+n.sub:''} ${[n.phone,n.mobile].filter(Boolean).join(' / ')}</div>
+  c.innerHTML=`<div class="hlist">${nets.map(n=>{
+    const recs=db.records.filter(r=>r.nid===n.id).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    const recSummary=recs.length?recs.slice(0,3).map(r=>`<div style="font-size:11px;color:var(--sub);padding:2px 0;border-bottom:1px solid var(--border);">
+      <span class="badge ${r.type==='visit'?'b-green':'b-blue'}" style="font-size:10px;">${r.type==='visit'?'拜會':'記事'}</span>
+      ${r.date||''} <span style="color:var(--hint)">社工：${r.worker||'—'}</span>
+      <div style="color:var(--text);margin-top:1px;">${r.content.slice(0,40)}${r.content.length>40?'…':''}</div>
+    </div>`).join(''):'';
+    return `<div class="hitem">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:${recs.length?'8px':'0'};">
+        <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
+          <div class="ava ${catAva(n.cat)}" style="width:30px;height:30px;font-size:11px;">${n.name.slice(-2)}</div>
+          <div>
+            <div style="font-weight:500;font-size:13px;">${n.name} <span class="badge b-amber" style="font-size:10px;">${n.cat}</span></div>
+            <div style="font-size:11px;color:var(--sub);">${n.area}${n.sub?' · '+n.sub:''} ${[n.phone,n.mobile].filter(Boolean).join(' / ')}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0;">
+          <button class="btn btn-sm" onclick="openModal('${n.id}')">編輯</button>
+          <button class="btn btn-sm" style="color:var(--red);border-color:var(--red);" onclick="delNet('${n.id}')">刪除</button>
         </div>
       </div>
-      <div style="display:flex;gap:6px;flex-shrink:0;">
-        <button class="btn btn-sm" onclick="openModal('${n.id}')">編輯</button>
-        <button class="btn btn-sm" style="color:var(--red);border-color:var(--red);" onclick="delNet('${n.id}')">刪除</button>
-      </div>
-    </div>`).join('')}</div>`;
+      ${recSummary}
+      ${recs.length>3?`<div style="font-size:11px;color:var(--hint);padding-top:4px;">還有 ${recs.length-3} 筆記錄...</div>`:''}
+    </div>`;
+  }).join('')}</div>`;
 }
 
 // ── Modal 新增/編輯 ──
