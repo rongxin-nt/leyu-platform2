@@ -438,7 +438,15 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
         <div class="action-bar">
           <button class="btn btn-p" onclick="openModal(null)">＋ 新增資源單位</button>
         </div>
+        <div class="sbar">
+          <input id="m-kw" placeholder="搜尋單位名稱..." oninput="mgmtPage=1;renderMgmt()"/>
+          <select id="m-cat" onchange="mgmtPage=1;renderMgmt()"><option value="">全部單位別</option></select>
+          <select id="m-area" onchange="mgmtPage=1;renderMgmt()"><option value="">全部地區</option></select>
+          <select id="m-worker" onchange="mgmtPage=1;renderMgmt()"><option value="">全部社工</option></select>
+        </div>
+        <div class="rmeta" id="m-meta"></div>
         <div id="mgmt-list"></div>
+        <div class="pagination" id="m-pagination"></div>
       </div>
 
     </div>
@@ -584,7 +592,7 @@ function go(p){
   document.getElementById('p-'+p).classList.add('on');
   const nav=document.getElementById('n-'+p);
   if(nav) nav.classList.add('on');
-  const fn={search:()=>{searchPage=1;renderSearch();},hist:()=>{histPage=1;renderHist();},stats:renderStats,mgmt:renderMgmt,rec:initRecForm,visit:initVisitForm,import:resetImport,add:clearAdd};
+  const fn={search:()=>{searchPage=1;renderSearch();},hist:()=>{histPage=1;renderHist();},stats:renderStats,mgmt:()=>{mgmtPage=1;renderMgmt();},rec:initRecForm,visit:initVisitForm,import:resetImport,add:clearAdd};
   if(fn[p]) fn[p]();
   populateFilters();
 }
@@ -1094,14 +1102,15 @@ function getStatRecs(){
   });
 }
 
-function miniBar(entries,color){
+function miniBar(entries, colors){
   if(!entries.length) return '<div style="font-size:12px;color:var(--hint);padding:4px 0;">尚無資料</div>';
   const max=Math.max(...entries.map(e=>e[1]),1);
-  return entries.map(([label,val])=>`
+  const colorArr = Array.isArray(colors) ? colors : entries.map(()=>colors);
+  return entries.map(([label,val],i)=>`
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
       <div style="font-size:11px;color:var(--sub);width:72px;text-align:right;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${label}</div>
       <div style="flex:1;height:14px;background:var(--bg);border-radius:3px;overflow:hidden;">
-        <div style="width:${Math.round(val/max*100)}%;height:100%;background:${color};border-radius:3px;"></div>
+        <div style="width:${Math.round(val/max*100)}%;height:100%;background:${colorArr[i%colorArr.length]};border-radius:3px;"></div>
       </div>
       <div style="font-size:11px;color:var(--hint);width:24px;flex-shrink:0;">${val}</div>
     </div>`).join('');
@@ -1140,30 +1149,33 @@ function renderStats(){
   const sortedA=Object.entries(byA).sort((a,b)=>b[1]-a[1]);
   const sortedMonth=Object.entries(byMonth).sort((a,b)=>a[0].localeCompare(b[0])).slice(-6);
 
+  const BLUE='#1A5FA8',GREEN='#2A7A4C',AMBER='#B8720F',PURPLE='#7C3AED',RED='#B83232',TEAL='#0D7377';
+  const catColors=['#1A5FA8','#2A7A4C','#B8720F','#7C3AED','#B83232','#0D7377','#D97706','#059669','#DC2626'];
+
   const cw=`<div class="s2-wrap">
     <div class="s2-card">
       <div class="s2-title">各社工互動次數</div>
-      ${miniBar(sortedW,'var(--blue)')}
+      ${miniBar(sortedW,['#1A5FA8','#2563EB','#3B82F6','#60A5FA','#93C5FD'])}
     </div>
     <div class="s2-card">
       <div class="s2-title">各單位別互動次數</div>
-      ${miniBar(sortedCat,'var(--green)')}
+      ${miniBar(sortedCat,catColors)}
     </div>
     <div class="s2-card">
       <div class="s2-title">各地區互動次數</div>
-      ${miniBar(sortedA,'var(--amber)')}
+      ${miniBar(sortedA,['#B8720F','#D97706','#F59E0B','#FCD34D'])}
     </div>
     <div class="s2-card">
       <div class="s2-title">近6個月趨勢</div>
-      ${miniBar(sortedMonth,'#8B5CF6')}
+      ${miniBar(sortedMonth,['#7C3AED','#8B5CF6','#A78BFA','#C4B5FD','#DDD6FE','#EDE9FE'])}
     </div>
     <div class="s2-card">
       <div class="s2-title">互動類型比例</div>
-      ${miniBar(Object.entries(byType),'var(--blue)')}
+      ${miniBar(Object.entries(byType),[GREEN,BLUE])}
     </div>
     <div class="s2-card">
       <div class="s2-title">單位互動覆蓋率</div>
-      ${miniBar([['有互動',activeNets],['未互動',inactiveNets]],'var(--teal)')}
+      ${miniBar([['有互動',activeNets],['未互動',inactiveNets]],[TEAL,'#C5C1B8'])}
       <div style="font-size:11px;color:var(--hint);margin-top:4px;">共 ${totalNets} 個單位，${activeNets} 個有互動記錄</div>
     </div>
   </div>`;
@@ -1180,24 +1192,63 @@ function renderStats(){
     ${cw}`;
 }
 
-// ── 管理 ──
+// ── 管理（含搜尋篩選分頁）──
+let mgmtPage = 1;
+
+function populateMgmtFilters(){
+  const areas=[...new Set(db.networks.map(n=>n.area).filter(Boolean))].sort((a,b)=>strokeSort(a,b));
+  const mArea=document.getElementById('m-area');
+  if(mArea){ const cur=mArea.value; while(mArea.options.length>1) mArea.remove(1); areas.forEach(a=>mArea.add(new Option(a,a))); mArea.value=cur; }
+  const mCat=document.getElementById('m-cat');
+  if(mCat){ const cur=mCat.value; while(mCat.options.length>1) mCat.remove(1); UNIT_CATS.forEach(c=>mCat.add(new Option(c,c))); mCat.value=cur; }
+  const workers=[...new Set(db.records.map(r=>r.worker).filter(Boolean))].sort((a,b)=>strokeSort(a,b));
+  const mWorker=document.getElementById('m-worker');
+  if(mWorker){ const cur=mWorker.value; while(mWorker.options.length>1) mWorker.remove(1); workers.forEach(w=>mWorker.add(new Option(w,w))); mWorker.value=cur; }
+}
+
 function renderMgmt(){
-  const nets=[...db.networks].sort((a,b)=>a.cat.localeCompare(b.cat)||a.area.localeCompare(b.area));
+  populateMgmtFilters();
+  const kw=(document.getElementById('m-kw')||{}).value?.toLowerCase()||'';
+  const cat=gv('m-cat'), area=gv('m-area'), worker=gv('m-worker');
+
+  let nets=sortByStroke(db.networks,'name').filter(n=>{
+    if(kw&&!(n.name.toLowerCase().includes(kw)||(n.sub||'').toLowerCase().includes(kw))) return false;
+    if(cat&&n.cat!==cat) return false;
+    if(area&&n.area!==area) return false;
+    if(worker){
+      const hasWorker=db.records.some(r=>r.nid===n.id&&r.worker===worker);
+      if(!hasWorker) return false;
+    }
+    return true;
+  });
+
+  const total=nets.length;
+  const totalPages=Math.max(1,Math.ceil(total/PAGE_SIZE));
+  if(mgmtPage>totalPages) mgmtPage=totalPages;
+  const start=(mgmtPage-1)*PAGE_SIZE;
+  const pageNets=nets.slice(start,start+PAGE_SIZE);
+
+  const metaEl=document.getElementById('m-meta');
+  if(metaEl) metaEl.textContent=`共 ${total} 筆`;
+
   const c=document.getElementById('mgmt-list');
-  if(!nets.length){c.innerHTML='<div class="empty">尚無資源單位資料</div>';return;}
-  c.innerHTML=`<div class="hlist">${nets.map(n=>{
+  if(!pageNets.length){c.innerHTML='<div class="empty">找不到符合的資源單位</div>';renderMgmtPagination(0,1);return;}
+  c.innerHTML=`<div class="hlist">${pageNets.map(n=>{
     const recs=db.records.filter(r=>r.nid===n.id).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-    const recSummary=recs.length?recs.slice(0,3).map(r=>`<div style="font-size:11px;color:var(--sub);padding:2px 0;border-bottom:1px solid var(--border);">
+    const recSummary=recs.length?recs.slice(0,3).map(r=>`<div style="font-size:11px;color:var(--sub);padding:3px 0;border-bottom:1px solid var(--border);">
       <span class="badge ${r.type==='visit'?'b-green':'b-blue'}" style="font-size:10px;">${r.type==='visit'?'拜會':'記事'}</span>
-      ${r.date||''} <span style="color:var(--hint)">社工：${r.worker||'—'}</span>
-      <div style="color:var(--text);margin-top:1px;">${r.content.slice(0,40)}${r.content.length>40?'…':''}</div>
+      <span style="margin-left:4px;">${r.date||''}</span>
+      <span style="color:var(--hint);margin-left:6px;">社工：${r.worker||'—'}</span>
+      <div style="color:var(--text);margin-top:2px;line-height:1.5;">${r.content.slice(0,50)}${r.content.length>50?'…':''}</div>
     </div>`).join(''):'';
     return `<div class="hitem">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:${recs.length?'8px':'0'};">
         <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
           <div class="ava ${catAva(n.cat)}" style="width:30px;height:30px;font-size:11px;">${n.name.slice(-2)}</div>
           <div>
-            <div style="font-weight:500;font-size:13px;">${n.name} <span class="badge b-amber" style="font-size:10px;">${n.cat}</span></div>
+            <div style="font-weight:500;font-size:13px;">${n.name} <span class="badge b-amber" style="font-size:10px;">${n.cat}</span>
+              <span style="font-size:11px;color:var(--hint);font-weight:400;margin-left:4px;">${recs.length} 筆互動</span>
+            </div>
             <div style="font-size:11px;color:var(--sub);">${n.area}${n.sub?' · '+n.sub:''} ${[n.phone,n.mobile].filter(Boolean).join(' / ')}</div>
           </div>
         </div>
@@ -1210,7 +1261,28 @@ function renderMgmt(){
       ${recs.length>3?`<div style="font-size:11px;color:var(--hint);padding-top:4px;">還有 ${recs.length-3} 筆記錄...</div>`:''}
     </div>`;
   }).join('')}</div>`;
+  renderMgmtPagination(total,totalPages);
 }
+
+function renderMgmtPagination(total,totalPages){
+  const pg=document.getElementById('m-pagination');
+  if(!pg||totalPages<=1){if(pg)pg.innerHTML='';return;}
+  let html=`<button class="pg-btn" onclick="goMgmtPage(${mgmtPage-1})" ${mgmtPage<=1?'disabled':''}>‹ 上一頁</button>`;
+  const range=[];
+  for(let i=1;i<=totalPages;i++){
+    if(i===1||i===totalPages||Math.abs(i-mgmtPage)<=2) range.push(i);
+    else if(range[range.length-1]!=='...') range.push('...');
+  }
+  range.forEach(p=>{
+    if(p==='...') html+=`<span class="pg-info">…</span>`;
+    else html+=`<button class="pg-btn ${p===mgmtPage?'on':''}" onclick="goMgmtPage(${p})">${p}</button>`;
+  });
+  html+=`<button class="pg-btn" onclick="goMgmtPage(${mgmtPage+1})" ${mgmtPage>=totalPages?'disabled':''}>下一頁 ›</button>`;
+  html+=`<span class="pg-info">第 ${mgmtPage}/${totalPages} 頁，共 ${total} 筆</span>`;
+  pg.innerHTML=html;
+}
+
+function goMgmtPage(p){ mgmtPage=p; renderMgmt(); document.getElementById('p-mgmt').scrollTop=0; }
 
 // ── Modal 新增/編輯 ──
 function openModal(id){
