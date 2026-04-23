@@ -108,6 +108,26 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
 .ttype.on{background:var(--blue);color:#fff;border-color:var(--blue);}
 .empty{text-align:center;padding:2.5rem;color:var(--hint);font-size:13px;}
 .action-bar{display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;}
+
+/* 查詢表格 */
+.net-table{width:100%;border-collapse:collapse;background:var(--surface);border-radius:var(--rl);overflow:hidden;border:1px solid var(--border);}
+.net-table thead tr{background:var(--bg);}
+.net-table th{padding:10px 12px;text-align:left;font-size:12px;font-weight:600;color:var(--sub);border-bottom:1px solid var(--border);white-space:nowrap;}
+.net-table td{padding:10px 12px;font-size:13px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.net-table tr:last-child td{border-bottom:none;}
+.net-table tbody tr{transition:background .1s;cursor:pointer;}
+.net-table tbody tr:hover{background:var(--blue-l);}
+.net-table .expand-row{display:none;background:var(--bg);}
+.net-table .expand-row.on{display:table-row;}
+.net-table .expand-cell{padding:12px 16px;}
+.expand-detail{display:flex;gap:24px;flex-wrap:wrap;font-size:13px;}
+.expand-detail .eitem{display:flex;flex-direction:column;gap:2px;}
+.expand-detail .ekey{font-size:11px;color:var(--hint);}
+.expand-detail .eval{color:var(--text);}
+.expand-actions{display:flex;gap:8px;margin-top:10px;}
+.cnt-badge{display:inline-block;background:var(--blue-l);color:var(--blue-d);border-radius:12px;font-size:11px;font-weight:700;padding:1px 8px;}
+.cnt-badge.zero{background:var(--bg);color:var(--hint);}
+
 @media(max-width:640px){.sidebar{display:none;}.content{padding:1rem;}.frow{grid-template-columns:1fr;}}
 </style>
 </head>
@@ -312,8 +332,8 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
         <div class="fcard" style="max-width:660px;">
           <div style="background:var(--bg);border-radius:var(--r);padding:12px;margin-bottom:14px;font-size:12px;color:var(--sub);line-height:1.8;">
             <div style="font-weight:500;color:var(--text);margin-bottom:4px;">欄位順序（請依照此順序複製 Excel 資料）：</div>
-            <strong style="color:var(--text);">地區　→　單位別　→　單位名稱　→　聯絡電話　→　手機　→　地址</strong><br>
-            第一行若是標題列會自動略過。
+            <strong style="color:var(--text);">地區　→　單位別　→　單位名稱　→　里別／其他說明　→　聯絡電話　→　手機　→　地址</strong><br>
+            單位別為「里長」請填入里別；單位別為「其他」請填入說明；其餘單位此欄可留空。第一行若是標題列會自動略過。
           </div>
           <div class="fg" style="margin-bottom:12px;">
             <label class="flabel">貼上 Excel 複製的資料</label>
@@ -546,34 +566,62 @@ function renderSearch(){
   const nets=db.networks.filter(n=>{
     if(curNT!=='all'&&n.cat!==curNT) return false;
     if(area&&n.area!==area) return false;
-    if(kw&&!(n.name.toLowerCase().includes(kw)||(n.sub||'').toLowerCase().includes(kw))) return false;
+    if(kw&&!(n.name.toLowerCase().includes(kw)||(n.sub||'').toLowerCase().includes(kw)||(n.area||'').toLowerCase().includes(kw))) return false;
     return true;
   });
-  document.getElementById('s-meta').textContent=`共 ${nets.length} 筆`;
+  document.getElementById('s-meta').textContent=`共 ${nets.length} 筆，點擊列可展開詳細資料`;
   const c=document.getElementById('s-list');
   if(!nets.length){c.innerHTML='<div class="empty">找不到符合的資源單位</div>';return;}
-  c.innerHTML=`<div class="grid">${nets.map(n=>{
-    const cnt=db.records.filter(r=>r.nid===n.id).length;
-    return `<div class="card">
-      <div class="card-head">
-        <div class="ava ${catAva(n.cat)}">${n.name.slice(-2)}</div>
-        <div>
-          <div class="cname">${n.name}</div>
-          <div class="ctag">${n.cat}${n.sub?' · '+n.sub:''} · ${n.area}</div>
-        </div>
-      </div>
-      <div class="cbody">
-        ${n.phone?`<div class="irow"><span class="ik">電話</span><span class="iv">${n.phone}</span></div>`:''}
-        ${n.mobile?`<div class="irow"><span class="ik">手機</span><span class="iv">${n.mobile}</span></div>`:''}
-        ${n.addr?`<div class="irow"><span class="ik">地址</span><span class="iv" style="font-size:11px">${n.addr}</span></div>`:''}
-        <div class="irow"><span class="ik">互動次數</span><span class="iv" style="color:var(--blue);font-weight:500">${cnt} 次</span></div>
-      </div>
-      <div class="cfoot">
-        <button class="btn btn-sm" onclick="jumpHist('${n.id}','${n.name.replace(/'/g,'')}')">查看記錄</button>
-        <button class="btn btn-sm" onclick="quickRec('${n.id}','${n.cat}')">快速填寫</button>
-      </div>
-    </div>`;
-  }).join('')}</div>`;
+  c.innerHTML=`<table class="net-table">
+    <thead><tr>
+      <th style="width:36px"></th>
+      <th>單位名稱</th>
+      <th>單位別</th>
+      <th>地區</th>
+      <th>里別／備註</th>
+      <th>電話</th>
+      <th>互動次數</th>
+    </tr></thead>
+    <tbody>${nets.map(n=>{
+      const cnt=db.records.filter(r=>r.nid===n.id).length;
+      const subLabel = n.cat==='其他'&&n.catOther ? n.catOther : (n.sub||'');
+      const rid='row-'+n.id;
+      return `
+        <tr onclick="toggleRow('${n.id}')" id="${rid}">
+          <td style="text-align:center;color:var(--hint);font-size:11px;" id="arrow-${n.id}">▶</td>
+          <td style="font-weight:500;">${n.name}</td>
+          <td><span class="badge b-amber">${n.cat}</span></td>
+          <td>${n.area}</td>
+          <td style="color:var(--sub)">${subLabel}</td>
+          <td style="color:var(--sub)">${n.phone||n.mobile||'—'}</td>
+          <td><span class="cnt-badge ${cnt===0?'zero':''}">${cnt} 次</span></td>
+        </tr>
+        <tr class="expand-row" id="expand-${n.id}">
+          <td class="expand-cell" colspan="7">
+            <div class="expand-detail">
+              ${n.phone?`<div class="eitem"><span class="ekey">電話</span><span class="eval">${n.phone}</span></div>`:''}
+              ${n.mobile?`<div class="eitem"><span class="ekey">手機</span><span class="eval">${n.mobile}</span></div>`:''}
+              ${n.addr?`<div class="eitem"><span class="ekey">地址</span><span class="eval">${n.addr}</span></div>`:''}
+              ${n.catOther?`<div class="eitem"><span class="ekey">其他說明</span><span class="eval">${n.catOther}</span></div>`:''}
+              <div class="eitem"><span class="ekey">互動次數</span><span class="eval" style="color:var(--blue);font-weight:500">${cnt} 次</span></div>
+            </div>
+            <div class="expand-actions">
+              <button class="btn btn-sm btn-p" onclick="event.stopPropagation();jumpHist('${n.id}','${n.name.replace(/'/g,'')}')">查看歷史記錄</button>
+              <button class="btn btn-sm" onclick="event.stopPropagation();quickRec('${n.id}','${n.cat}')">快速填寫互動</button>
+            </div>
+          </td>
+        </tr>`;
+    }).join('')}
+    </tbody>
+  </table>`;
+}
+
+function toggleRow(id){
+  const expand=document.getElementById('expand-'+id);
+  const arrow=document.getElementById('arrow-'+id);
+  const isOn=expand.classList.contains('on');
+  expand.classList.toggle('on',!isOn);
+  arrow.textContent=isOn?'▶':'▼';
 }
 
 function jumpHist(nid,name){ go('hist'); document.getElementById('h-kw').value=name; renderHist(); }
@@ -722,7 +770,7 @@ function clearF(p){
 function showToast(id){ const el=document.getElementById(id);el.style.display='flex';setTimeout(()=>{el.style.display='none';},4000); }
 
 // ── 批次匯入 ──
-const IMPORT_COLS = ['地區','單位別','單位名稱','聯絡電話','手機','地址'];
+const IMPORT_COLS = ['地區','單位別','單位名稱','里別／其他說明','聯絡電話','手機','地址'];
 
 function resetImport(){
   parsedRows=[]; conflictMode=null;
@@ -737,20 +785,29 @@ function previewImport(){
   if(!raw){alert('請先貼上資料');return;}
   const lines=raw.split('\n').map(l=>l.trim()).filter(Boolean);
   const firstCells=lines[0].split('\t');
-  const isHeader = firstCells[0].includes('地區')||firstCells[2]?.includes('名稱')||firstCells[2]?.includes('姓名');
-  const dataLines = isHeader ? lines.slice(1) : lines;
+  const isHeader=firstCells[0].includes('地區')||firstCells[2]?.includes('名稱')||firstCells[2]?.includes('姓名');
+  const dataLines=isHeader?lines.slice(1):lines;
 
   parsedRows=dataLines.map(line=>{
     const cells=line.split('\t').map(c=>c.trim());
-    return { area:cells[0]||'', cat:cells[1]||'', name:cells[2]||'', phone:cells[3]||'', mobile:cells[4]||'', addr:cells[5]||'', sub:'' };
+    const cat=cells[1]||'';
+    const subField=cells[3]||'';
+    return {
+      area:   cells[0]||'',
+      cat:    cat,
+      name:   cells[2]||'',
+      sub:    cat==='里長' ? subField : '',
+      catOther: cat==='其他' ? subField : '',
+      phone:  cells[4]||'',
+      mobile: cells[5]||'',
+      addr:   cells[6]||'',
+    };
   }).filter(r=>r.area&&r.name);
 
   if(!parsedRows.length){alert('沒有解析到有效資料，請確認格式是否正確');return;}
 
   // 驗證單位別
-  parsedRows.forEach(r=>{
-    if(!UNIT_CATS.includes(r.cat)) r.cat='其他';
-  });
+  parsedRows.forEach(r=>{ if(!UNIT_CATS.includes(r.cat)) r.cat='其他'; });
 
   const table=document.getElementById('preview-table');
   table.innerHTML=`
@@ -760,6 +817,7 @@ function previewImport(){
         <td style="padding:4px 8px;">${r.area}</td>
         <td style="padding:4px 8px;"><span class="badge b-amber">${r.cat}</span></td>
         <td style="padding:4px 8px;font-weight:500;">${r.name}</td>
+        <td style="padding:4px 8px;color:var(--sub)">${r.sub||r.catOther||'—'}</td>
         <td style="padding:4px 8px;">${r.phone}</td>
         <td style="padding:4px 8px;">${r.mobile}</td>
         <td style="padding:4px 8px;font-size:11px;">${r.addr}</td>
@@ -793,10 +851,10 @@ function confirmImport(){
   parsedRows.forEach(r=>{
     const existing=db.networks.find(n=>n.name===r.name&&n.area===r.area);
     if(existing){
-      if(conflictMode==='overwrite'){ Object.assign(existing,{cat:r.cat,phone:r.phone,mobile:r.mobile,addr:r.addr}); overwritten++; }
+      if(conflictMode==='overwrite'){ Object.assign(existing,{cat:r.cat,sub:r.sub,catOther:r.catOther,phone:r.phone,mobile:r.mobile,addr:r.addr}); overwritten++; }
       else skipped++;
     } else {
-      db.networks.push({id:uid(),cat:r.cat,area:r.area,name:r.name,sub:r.sub,phone:r.phone,mobile:r.mobile,addr:r.addr});
+      db.networks.push({id:uid(),cat:r.cat,area:r.area,name:r.name,sub:r.sub,catOther:r.catOther,phone:r.phone,mobile:r.mobile,addr:r.addr});
       added++;
     }
   });
