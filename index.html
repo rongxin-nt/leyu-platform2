@@ -15,7 +15,7 @@
   --red:#B83232;--red-l:#FDEAEA;
   --r:8px;--rl:12px;
 }
-body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6;}
+body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:16px;line-height:1.6;}
 .app{display:flex;flex-direction:column;height:100vh;overflow:hidden;}
 .topbar{background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 1.25rem;height:52px;flex-shrink:0;}
 .brand{display:flex;align-items:center;gap:8px;font-size:16px;font-weight:700;}
@@ -126,11 +126,12 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
       <div class="nav-sec">查詢</div>
       <div class="nav on" onclick="go('search')" id="n-search">🔍 查詢資源單位</div>
       <div class="nav" onclick="go('hist')" id="n-hist">📋 歷史記錄</div>
-      <div class="nav-sec">填寫</div>
+      <div class="nav-sec">資料管理</div>
+      <div class="nav" onclick="go('add')" id="n-add">➕ 新增資源單位</div>
+      <div class="nav" onclick="go('import')" id="n-import">📋 批次匯入</div>
+      <div class="nav-sec">資源互動狀況填寫</div>
       <div class="nav" onclick="go('rec')" id="n-rec">✏️ 合作記事</div>
       <div class="nav" onclick="go('visit')" id="n-visit">🤝 里長拜會</div>
-      <div class="nav-sec">資料管理</div>
-      <div class="nav" onclick="go('import')" id="n-import">📋 批次匯入</div>
       <div class="nav-sec" id="nav-sup" style="display:none">督導專區</div>
       <div class="nav" onclick="go('stats')" id="n-stats" style="display:none">📊 統計報表</div>
       <div class="nav" onclick="go('mgmt')" id="n-mgmt" style="display:none">⚙️ 管理資源單位</div>
@@ -230,6 +231,77 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
             <button class="btn btn-lg" onclick="clearF('vi')">清除</button>
           </div>
           <div class="toast t-ok" id="vi-ok">✓ 拜會記錄已儲存！</div>
+        </div>
+      </div>
+
+      <!-- 新增資源單位 -->
+      <div class="page" id="p-add">
+        <div class="pg-title">新增資源單位</div>
+        <div class="pg-desc">填寫單筆資源單位資料，系統會自動檢查是否重複。</div>
+        <div class="fcard">
+          <div class="frow">
+            <div class="fg">
+              <label class="flabel">地區 *</label>
+              <input id="add-area" placeholder="例：蘆洲區" oninput="checkAddDup()"/>
+            </div>
+            <div class="fg">
+              <label class="flabel">單位別 *</label>
+              <select id="add-cat" onchange="toggleAddCatFields()">
+                <option value="">請選擇...</option>
+                <option>里長</option>
+                <option>公部門</option>
+                <option>民間單位</option>
+                <option>長照單位</option>
+                <option>勞政單位</option>
+                <option>其他</option>
+              </select>
+            </div>
+          </div>
+          <!-- 里長：顯示里別欄位 -->
+          <div class="frow full" id="add-village-wrap" style="display:none;">
+            <div class="fg">
+              <label class="flabel">里別 *</label>
+              <input id="add-sub-village" placeholder="例：永安里"/>
+            </div>
+          </div>
+          <!-- 其他：顯示其他說明欄位 -->
+          <div class="frow full" id="add-other-wrap" style="display:none;">
+            <div class="fg">
+              <label class="flabel">其他說明 *</label>
+              <input id="add-cat-other" placeholder="請說明單位性質"/>
+            </div>
+          </div>
+          <div class="frow full">
+            <div class="fg">
+              <label class="flabel">單位名稱 *</label>
+              <input id="add-name" placeholder="例：蘆洲區輔具中心" oninput="checkAddDup()"/>
+            </div>
+          </div>
+          <div class="frow">
+            <div class="fg">
+              <label class="flabel">聯絡電話</label>
+              <input id="add-phone" placeholder="02-xxxx-xxxx"/>
+            </div>
+            <div class="fg">
+              <label class="flabel">手機</label>
+              <input id="add-mobile" placeholder="09xx-xxx-xxx"/>
+            </div>
+          </div>
+          <div class="frow full">
+            <div class="fg">
+              <label class="flabel">地址</label>
+              <input id="add-addr" placeholder="通訊地址"/>
+            </div>
+          </div>
+          <!-- 重複提示 -->
+          <div id="add-dup-warn" style="display:none;background:var(--amber-l);border:1px solid #FAC775;border-radius:var(--r);padding:9px 12px;font-size:12px;color:var(--amber-d);margin-bottom:10px;">
+            ⚠️ 系統發現已有相同地區與名稱的資源單位：<span id="add-dup-info"></span>，請確認是否仍要新增。
+          </div>
+          <div class="factions">
+            <button class="btn btn-p btn-lg" onclick="submitAdd()">儲存新增</button>
+            <button class="btn btn-lg" onclick="clearAdd()">清除</button>
+          </div>
+          <div class="toast t-ok" id="add-ok">✓ 資源單位已新增！</div>
         </div>
       </div>
 
@@ -430,7 +502,7 @@ function go(p){
   document.getElementById('p-'+p).classList.add('on');
   const nav=document.getElementById('n-'+p);
   if(nav) nav.classList.add('on');
-  const fn={search:renderSearch,hist:renderHist,stats:renderStats,mgmt:renderMgmt,rec:initRecForm,visit:initVisitForm,import:resetImport};
+  const fn={search:renderSearch,hist:renderHist,stats:renderStats,mgmt:renderMgmt,rec:initRecForm,visit:initVisitForm,import:resetImport,add:clearAdd};
   if(fn[p]) fn[p]();
   populateFilters();
 }
@@ -543,6 +615,63 @@ function renderHist(){
       <div class="hbody">${r.content}</div>
     </div>`;
   }).join('')}</div>`;
+}
+
+// ── 新增資源單位 ──
+function toggleAddCatFields(){
+  const cat = gv('add-cat');
+  document.getElementById('add-village-wrap').style.display = cat==='里長' ? 'block' : 'none';
+  document.getElementById('add-other-wrap').style.display   = cat==='其他'  ? 'block' : 'none';
+  document.getElementById('add-dup-warn').style.display = 'none';
+  checkAddDup();
+}
+
+function checkAddDup(){
+  const area = gv('add-area').trim();
+  const name = gv('add-name').trim();
+  const warn = document.getElementById('add-dup-warn');
+  if(!area || !name){ warn.style.display='none'; return; }
+  const dup = db.networks.find(n=>n.area===area && n.name===name);
+  if(dup){
+    document.getElementById('add-dup-info').textContent = `「${dup.area} ${dup.name}（${dup.cat}）」`;
+    warn.style.display = 'block';
+  } else {
+    warn.style.display = 'none';
+  }
+}
+
+function submitAdd(){
+  const area   = gv('add-area').trim();
+  const cat    = gv('add-cat');
+  const name   = gv('add-name').trim();
+  const phone  = gv('add-phone').trim();
+  const mobile = gv('add-mobile').trim();
+  const addr   = gv('add-addr').trim();
+  const sub    = cat==='里長' ? gv('add-sub-village').trim() : '';
+  const catOther = cat==='其他' ? gv('add-cat-other').trim() : '';
+
+  if(!area){ alert('請填寫地區'); return; }
+  if(!cat){  alert('請選擇單位別'); return; }
+  if(cat==='里長' && !sub){ alert('請填寫里別'); return; }
+  if(cat==='其他' && !catOther){ alert('請填寫其他說明'); return; }
+  if(!name){ alert('請填寫單位名稱'); return; }
+
+  db.networks.push({ id:uid(), area, cat, sub, catOther, name, phone, mobile, addr });
+  save();
+  populateFilters();
+  renderSearch();
+  showToast('add-ok');
+  clearAdd();
+}
+
+function clearAdd(){
+  ['add-area','add-name','add-phone','add-mobile','add-addr','add-sub-village','add-cat-other'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  document.getElementById('add-cat').value='';
+  document.getElementById('add-village-wrap').style.display='none';
+  document.getElementById('add-other-wrap').style.display='none';
+  document.getElementById('add-dup-warn').style.display='none';
 }
 
 // ── 合作記事表單 ──
