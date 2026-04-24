@@ -794,6 +794,16 @@ function renderSearch(){
     if(kw&&!(n.name.toLowerCase().includes(kw)||(n.sub||'').toLowerCase().includes(kw)||(n.area||'').toLowerCase().includes(kw))) return false;
     return true;
   });
+
+  // 三層排序：互動次數多到少 → 地區第一字筆畫少到多 → 單位名稱第一字筆畫少到多
+  filteredNets.sort((a,b)=>{
+    const cntA=db.records.filter(r=>r.nid===a.id).length;
+    const cntB=db.records.filter(r=>r.nid===b.id).length;
+    if(cntB!==cntA) return cntB-cntA;
+    const areaComp=strokeSort((a.area||'')[0]||'',(b.area||'')[0]||'');
+    if(areaComp!==0) return areaComp;
+    return strokeSort((a.name||'')[0]||'',(b.name||'')[0]||'');
+  });
   const total=filteredNets.length;
   const totalPages=Math.max(1,Math.ceil(total/PAGE_SIZE));
   if(searchPage>totalPages) searchPage=totalPages;
