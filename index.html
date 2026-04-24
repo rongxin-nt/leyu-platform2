@@ -2,10 +2,11 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
 <title>榮欣新北身障網絡資源平台</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0;}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
 :root{
   --bg:#F4F3EF;--surface:#fff;--border:#E0DDD6;--border2:#C5C1B8;
   --text:#1C1B18;--sub:#68665E;--hint:#A5A39C;
@@ -232,7 +233,7 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
         </div>
         <div id="map-legend" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:.75rem;font-size:12px;"></div>
         <div id="map-status" style="font-size:12px;color:var(--hint);margin-bottom:.5rem;"></div>
-        <div id="map-container" style="width:100%;height:72vw;max-height:680px;min-height:420px;border-radius:var(--rl);overflow:hidden;border:1px solid var(--border);background:var(--bg);"></div>
+        <div id="map-container" style="width:100%;height:72vw;max-height:680px;min-height:420px;border-radius:var(--rl);overflow:hidden;border:1px solid var(--border);background:var(--bg);touch-action:pan-x pan-y;"></div>
       </div>
 
       <!-- 歷史 -->
@@ -1545,6 +1546,7 @@ function initMap(){
     mapTypeControl:false,
     streetViewControl:false,
     fullscreenControl:true,
+    gestureHandling:'greedy',
     zoomControlOptions:{position:google.maps.ControlPosition.RIGHT_CENTER}
   });
   loadGeoCache();
