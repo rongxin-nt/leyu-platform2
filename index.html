@@ -152,7 +152,29 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
 .cnt-badge{display:inline-block;background:var(--blue-l);color:var(--blue-d);border-radius:12px;font-size:11px;font-weight:700;padding:1px 8px;}
 .cnt-badge.zero{background:var(--bg);color:var(--hint);}
 
-@media(max-width:640px){.sidebar{display:none;}.content{padding:1rem;}.frow{grid-template-columns:1fr;}}
+@media(max-width:640px){
+  .sidebar{display:none;}
+  .content{padding:1rem;}
+  .frow{grid-template-columns:1fr;}
+  .app{padding-bottom:60px;}
+  .net-table th:nth-child(5),.net-table td:nth-child(5),
+  .net-table th:nth-child(6),.net-table td:nth-child(6){display:none;}
+}
+
+/* 手機底部導覽 */
+.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);z-index:150;height:60px;}
+.mobile-nav-inner{display:flex;height:100%;}
+.mob-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;border:none;background:none;font-family:inherit;color:var(--sub);font-size:10px;padding:4px 2px;transition:color .12s;}
+.mob-btn:hover{color:var(--text);}
+.mob-btn.on{color:var(--blue);}
+.mob-btn .mob-icon{font-size:18px;line-height:1;}
+.mob-more-menu{display:none;position:fixed;bottom:60px;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);z-index:149;padding:.5rem 0;}
+.mob-more-menu.on{display:block;}
+.mob-more-item{display:flex;align-items:center;gap:10px;padding:12px 1.25rem;font-size:14px;color:var(--sub);cursor:pointer;}
+.mob-more-item:hover,.mob-more-item.on{background:var(--blue-l);color:var(--blue-d);}
+.mob-overlay{display:none;position:fixed;inset:0;z-index:148;}
+.mob-overlay.on{display:block;}
+@media(max-width:640px){.mobile-nav{display:block;}}
 </style>
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCpc7FHkOiXZw6oNSbgkJrlXjoHNN1VcqQ&language=zh-TW" async defer></script>
 </head>
@@ -474,7 +496,39 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
   </div>
 </div>
 
-<!-- 密碼驗證 Modal -->
+<!-- 手機底部遮罩 -->
+<div class="mob-overlay" id="mob-overlay" onclick="closeMobMore()"></div>
+
+<!-- 手機更多選單 -->
+<div class="mob-more-menu" id="mob-more-menu">
+  <div class="mob-more-item" id="mm-map" onclick="mobGo('map')">🗺️ 地圖檢視</div>
+  <div class="mob-more-item" id="mm-add" onclick="mobGo('add')">➕ 新增資源單位</div>
+  <div class="mob-more-item" id="mm-import" onclick="mobGo('import')">📋 批次匯入</div>
+  <div class="mob-more-item" id="mm-visit" onclick="mobGo('visit')">🤝 里長拜會</div>
+  <div class="mob-more-item" id="mm-stats" style="display:none" onclick="mobGo('stats')">📊 統計報表</div>
+  <div class="mob-more-item" id="mm-mgmt" style="display:none" onclick="mobGo('mgmt')">⚙️ 管理資源單位</div>
+</div>
+
+<!-- 手機底部導覽 -->
+<nav class="mobile-nav">
+  <div class="mobile-nav-inner">
+    <button class="mob-btn on" id="mob-search" onclick="mobGo('search')">
+      <span class="mob-icon">🔍</span>查詢
+    </button>
+    <button class="mob-btn" id="mob-hist" onclick="mobGo('hist')">
+      <span class="mob-icon">📋</span>記錄
+    </button>
+    <button class="mob-btn" id="mob-rec" onclick="mobGo('rec')">
+      <span class="mob-icon">✏️</span>合作記事
+    </button>
+    <button class="mob-btn" id="mob-super" onclick="mobSuperBtn()">
+      <span class="mob-icon">👤</span>督導
+    </button>
+    <button class="mob-btn" id="mob-more" onclick="toggleMobMore()">
+      <span class="mob-icon">☰</span>更多
+    </button>
+  </div>
+</nav>
 <div class="overlay" id="pwd-modal">
   <div class="modal" style="width:360px;">
     <div class="modal-title">🔐 督導模式驗證</div>
@@ -658,6 +712,7 @@ function closePwdModal(){ document.getElementById('pwd-modal').classList.remove(
 
 function logout(){
   isSuperMode = false;
+  updateMobSuperItems();
   switchMode('social');
 }
 
@@ -666,12 +721,14 @@ let mode = 'social';
 function switchMode(m){
   mode = m;
   const isSuper = m==='super';
+  isSuperMode = isSuper;
   document.getElementById('tab-social').classList.toggle('on', !isSuper);
   document.getElementById('tab-super').classList.toggle('on', isSuper);
   document.getElementById('btn-logout').style.display = isSuper ? '' : 'none';
   document.getElementById('nav-sup').style.display = isSuper ? '' : 'none';
   document.getElementById('n-stats').style.display = isSuper ? '' : 'none';
   document.getElementById('n-mgmt').style.display = isSuper ? '' : 'none';
+  updateMobSuperItems();
   isSuper ? go('stats') : go('search');
 }
 
@@ -682,6 +739,7 @@ function go(p){
   document.getElementById('p-'+p).classList.add('on');
   const nav=document.getElementById('n-'+p);
   if(nav) nav.classList.add('on');
+  updateMobNav(p);
   const fn={search:()=>{searchPage=1;renderSearch();},hist:()=>{histPage=1;renderHist();},map:initMapPage,stats:renderStats,mgmt:()=>{mgmtPage=1;renderMgmt();},rec:initRecForm,visit:initVisitForm,import:resetImport,add:clearAdd};
   if(fn[p]) fn[p]();
   populateFilters();
@@ -1651,6 +1709,54 @@ function initMapPage(){
 function showLoading(on){
   const el=document.getElementById('loading-overlay');
   if(el) el.classList.toggle('on',on);
+}
+
+// ── 手機導覽 ──
+function mobGo(p){
+  closeMobMore();
+  go(p);
+  updateMobNav(p);
+}
+
+function updateMobNav(p){
+  ['search','hist','rec','super','more'].forEach(id=>{
+    const el=document.getElementById('mob-'+id);
+    if(el) el.classList.remove('on');
+  });
+  const map={'search':'mob-search','hist':'mob-hist','rec':'mob-rec','visit':'mob-rec','stats':'mob-super','mgmt':'mob-super'};
+  const target=map[p];
+  if(target){ const el=document.getElementById(target); if(el) el.classList.add('on'); }
+}
+
+function toggleMobMore(){
+  const menu=document.getElementById('mob-more-menu');
+  const overlay=document.getElementById('mob-overlay');
+  const isOn=menu.classList.contains('on');
+  menu.classList.toggle('on',!isOn);
+  overlay.classList.toggle('on',!isOn);
+  document.getElementById('mob-more').classList.toggle('on',!isOn);
+}
+
+function closeMobMore(){
+  document.getElementById('mob-more-menu').classList.remove('on');
+  document.getElementById('mob-overlay').classList.remove('on');
+  document.getElementById('mob-more').classList.remove('on');
+}
+
+function mobSuperBtn(){
+  closeMobMore();
+  if(isSuperMode){ go('stats'); updateMobNav('stats'); }
+  else { askSuperPwd(); }
+}
+
+function updateMobSuperItems(){
+  const show=isSuperMode;
+  ['mm-stats','mm-mgmt'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.style.display=show?'flex':'none';
+  });
+  const btn=document.getElementById('mob-super');
+  if(btn){ btn.innerHTML=`<span class="mob-icon">${show?'📊':'👤'}</span><span>${show?'統計':'督導'}</span>`; }
 }
 
 // ── 初始化 ──
