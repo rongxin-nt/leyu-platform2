@@ -502,10 +502,10 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
 
 <!-- 手機更多選單 -->
 <div class="mob-more-menu" id="mob-more-menu">
-  <div class="mob-more-item" id="mm-map" onclick="mobGo('map')">🗺️ 地圖檢視</div>
-  <div class="mob-more-item" id="mm-add" onclick="mobGo('add')">➕ 新增資源單位</div>
-  <div class="mob-more-item" id="mm-import" onclick="mobGo('import')">📋 批次匯入</div>
+  <div class="mob-more-item" id="mm-rec" onclick="mobGo('rec')">✏️ 合作記事</div>
   <div class="mob-more-item" id="mm-visit" onclick="mobGo('visit')">🤝 里長拜會</div>
+  <div class="mob-more-item" id="mm-import" onclick="mobGo('import')">📋 批次匯入</div>
+  <div class="mob-more-item" id="mm-super" onclick="mobSuperBtn()">👤 督導模式</div>
   <div class="mob-more-item" id="mm-stats" style="display:none" onclick="mobGo('stats')">📊 統計報表</div>
   <div class="mob-more-item" id="mm-mgmt" style="display:none" onclick="mobGo('mgmt')">⚙️ 管理資源單位</div>
 </div>
@@ -519,11 +519,11 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
     <button class="mob-btn" id="mob-hist" onclick="mobGo('hist')">
       <span class="mob-icon">📋</span>記錄
     </button>
-    <button class="mob-btn" id="mob-rec" onclick="mobGo('rec')">
-      <span class="mob-icon">✏️</span>合作記事
+    <button class="mob-btn" id="mob-map" onclick="mobGo('map')">
+      <span class="mob-icon">🗺️</span>地圖
     </button>
-    <button class="mob-btn" id="mob-super" onclick="mobSuperBtn()">
-      <span class="mob-icon">👤</span>督導
+    <button class="mob-btn" id="mob-add" onclick="mobGo('add')">
+      <span class="mob-icon">➕</span>新增
     </button>
     <button class="mob-btn" id="mob-more" onclick="toggleMobMore()">
       <span class="mob-icon">☰</span>更多
@@ -1665,6 +1665,15 @@ function renderMarkers(){
            </div>`
         : `<div style="font-size:12px;color:#A5A39C;margin-top:6px;">尚無互動記錄</div>`;
 
+      const navBtn = n.addr
+        ? `<div style="margin-top:6px;">
+            <button onclick="openNav('${n.addr.replace(/'/g,'')}');return false;"
+              style="background:#34A853;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:inherit;">
+              🧭 導航到這裡
+            </button>
+           </div>`
+        : '';
+
       infoWindow.setContent(`
         <div style="font-family:'Noto Sans TC',sans-serif;padding:4px;min-width:190px;">
           <div style="font-weight:700;font-size:14px;margin-bottom:4px;">${n.name}</div>
@@ -1675,6 +1684,7 @@ function renderMarkers(){
           ${n.phone?`<div style="font-size:12px;margin-top:4px;">📞 ${n.phone}</div>`:''}
           ${n.mobile?`<div style="font-size:12px;">📱 ${n.mobile}</div>`:''}
           ${recBtn}
+          ${navBtn}
         </div>`);
       infoWindow.open(gmap, marker);
     });
@@ -1691,6 +1701,22 @@ function jumpHistFromMap(nid, name){
   ['h-area','h-cat','h-type','h-worker'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('h-kw').value = name;
   go('hist');
+}
+
+function openNav(addr){
+  const encoded = encodeURIComponent(addr);
+  // iOS 優先嘗試開啟 Google Maps App，失敗則開網頁版
+  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+  const isAndroid = /Android/.test(navigator.userAgent);
+  if(isIOS){
+    window.open(`comgooglemaps://?daddr=${encoded}&directionsmode=driving`, '_blank');
+    setTimeout(()=>{ window.open(`https://maps.google.com/maps?daddr=${encoded}`, '_blank'); }, 500);
+  } else if(isAndroid){
+    window.open(`google.navigation:q=${encoded}`, '_blank');
+    setTimeout(()=>{ window.open(`https://maps.google.com/maps?daddr=${encoded}`, '_blank'); }, 500);
+  } else {
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${encoded}`, '_blank');
+  }
 }
 
 // ── 初始化地圖頁面 ──
@@ -1721,11 +1747,13 @@ function mobGo(p){
 }
 
 function updateMobNav(p){
-  ['search','hist','rec','super','more'].forEach(id=>{
+  ['search','hist','map','add','more'].forEach(id=>{
     const el=document.getElementById('mob-'+id);
     if(el) el.classList.remove('on');
   });
-  const map={'search':'mob-search','hist':'mob-hist','rec':'mob-rec','visit':'mob-rec','stats':'mob-super','mgmt':'mob-super'};
+  const map={'search':'mob-search','hist':'mob-hist','map':'mob-map','add':'mob-add',
+    'rec':'mob-more','visit':'mob-more','import':'mob-more',
+    'stats':'mob-more','mgmt':'mob-more'};
   const target=map[p];
   if(target){ const el=document.getElementById(target); if(el) el.classList.add('on'); }
 }
@@ -1757,8 +1785,8 @@ function updateMobSuperItems(){
     const el=document.getElementById(id);
     if(el) el.style.display=show?'flex':'none';
   });
-  const btn=document.getElementById('mob-super');
-  if(btn){ btn.innerHTML=`<span class="mob-icon">${show?'📊':'👤'}</span><span>${show?'統計':'督導'}</span>`; }
+  const mmSuper=document.getElementById('mm-super');
+  if(mmSuper) mmSuper.style.display=show?'none':'flex';
 }
 
 // ── 初始化 ──
