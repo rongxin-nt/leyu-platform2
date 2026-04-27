@@ -228,8 +228,14 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
         <div class="pg-title">地圖檢視</div>
         <div class="pg-desc">在地圖上顯示所有資源單位的位置，不同單位別以不同顏色標示。</div>
         <div style="display:flex;gap:8px;margin-bottom:.75rem;flex-wrap:wrap;align-items:center;">
-          <div id="map-cat-bar" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
-          <button class="btn btn-sm" onclick="geocodeAll()" id="btn-geocode" style="margin-left:auto;">📍 重新定位所有地址</button>
+          <div id="map-cat-bar" style="display:flex;gap:6px;flex-wrap:wrap;flex:1;"></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:.75rem;flex-wrap:wrap;align-items:center;">
+          <input id="map-search-kw" placeholder="搜尋單位名稱..." style="flex:1;min-width:180px;height:36px;border:1px solid var(--border2);border-radius:var(--r);background:var(--surface);color:var(--text);font-family:inherit;font-size:13px;padding:0 10px;outline:none;"
+            oninput="mapSearchInput()" onkeydown="if(event.key==='Enter')mapSearch()"/>
+          <button class="btn btn-p" onclick="mapSearch()">🔍 查詢</button>
+          <button class="btn" onclick="mapSearchClear()">清除</button>
+          <button class="btn btn-sm" onclick="geocodeAll()" id="btn-geocode" style="margin-left:auto;">📍 重新定位</button>
         </div>
         <div id="map-legend" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:.75rem;font-size:12px;"></div>
         <div id="map-status" style="font-size:12px;color:var(--hint);margin-bottom:.5rem;"></div>
@@ -249,7 +255,6 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
             <option value="rec">合作記事</option>
             <option value="visit">里長拜會</option>
           </select>
-          <select id="h-worker" onchange="renderHist()"><option value="">全部社工</option></select>
         </div>
         <div class="rmeta" id="h-meta"></div>
         <div id="h-list"></div>
@@ -956,7 +961,7 @@ let histPage = 1;
 
 function renderHist(){
   histPage = histPage||1;
-  const area=gv('h-area'),cat=gv('h-cat'),kw=gv('h-kw').toLowerCase(),type=gv('h-type'),worker=gv('h-worker');
+  const area=gv('h-area'),cat=gv('h-cat'),kw=gv('h-kw').toLowerCase(),type=gv('h-type');
   let recs=[...db.records].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   recs=recs.filter(r=>{
     const net=db.networks.find(n=>n.id===r.nid)||{};
@@ -964,7 +969,6 @@ function renderHist(){
     if(cat&&net.cat!==cat) return false;
     if(kw&&!(net.name||'').toLowerCase().includes(kw)&&!(net.sub||'').toLowerCase().includes(kw)) return false;
     if(type&&r.type!==type) return false;
-    if(worker&&r.worker!==worker) return false;
     return true;
   });
   const total=recs.length;
@@ -1635,8 +1639,12 @@ function renderMarkers(){
 
   const infoWindow = new google.maps.InfoWindow();
 
-  // 點地圖空白處關閉 infoWindow
-  gmap.addListener('click', ()=>{ infoWindow.close(); });
+  // 點地圖空白處關閉 infoWindow 並還原標記
+  gmap.addListener('click', ()=>{
+    infoWindow.close();
+    if(mapSearchInfoWindow) mapSearchInfoWindow.close();
+    gmarkers.forEach(m=>m.setOpacity(1));
+  });
 
   const nets = db.networks.filter(n=>{
     if(mapCurCat!=='all' && n.cat!==mapCurCat) return false;
@@ -1664,6 +1672,7 @@ function renderMarkers(){
         strokeWeight: 2,
       }
     });
+    marker.set('nid', n.id);
 
     marker.addListener('click', ()=>{
       const recBtn = cnt > 0
@@ -1708,9 +1717,104 @@ function renderMarkers(){
 }
 
 function jumpHistFromMap(nid, name){
-  ['h-area','h-cat','h-type','h-worker'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['h-area','h-cat','h-type'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('h-kw').value = name;
   go('hist');
+}
+
+// ── 地圖搜尋 ──
+let mapSearchMarker = null;
+let mapSearchInfoWindow = null;
+
+function mapSearchInput(){
+  // 清空時還原所有標記
+  const kw = document.getElementById('map-search-kw').value.trim();
+  if(!kw) mapSearchClear();
+}
+
+function mapSearch(){
+  const kw = document.getElementById('map-search-kw').value.trim().toLowerCase();
+  if(!kw){ mapSearchClear(); return; }
+  if(!gmap){ alert('地圖尚未載入，請稍候再試'); return; }
+
+  // 找符合的資源單位
+  const results = db.networks.filter(n=>{
+    return (n.name||'').toLowerCase().includes(kw) ||
+           (n.sub||'').toLowerCase().includes(kw) ||
+           (n.area||'').toLowerCase().includes(kw);
+  }).filter(n => geocache[n.id]);
+
+  if(!results.length){
+    document.getElementById('map-status').textContent = `找不到「${kw}」，請確認名稱或先點「重新定位」`;
+    return;
+  }
+
+  // 關閉舊的infoWindow
+  if(mapSearchInfoWindow){ mapSearchInfoWindow.close(); }
+
+  if(results.length === 1){
+    // 只有一筆：直接跳到該點並開啟資訊卡
+    const n = results[0];
+    const pos = geocache[n.id];
+    gmap.panTo(pos);
+    gmap.setZoom(16);
+    openMapInfo(n);
+    document.getElementById('map-status').textContent = `已找到：${n.name}`;
+  } else {
+    // 多筆：縮放到包含所有結果的範圍，並顯示數量
+    const bounds = new google.maps.LatLngBounds();
+    results.forEach(n => bounds.extend(geocache[n.id]));
+    gmap.fitBounds(bounds);
+    document.getElementById('map-status').textContent = `找到 ${results.length} 筆符合「${kw}」的單位`;
+    // 高亮這些標記（把其他標記變淡）
+    highlightMarkers(results.map(n=>n.id));
+  }
+}
+
+function mapSearchClear(){
+  document.getElementById('map-search-kw').value = '';
+  document.getElementById('map-status').textContent = `顯示 ${gmarkers.length} 個資源單位`;
+  if(mapSearchInfoWindow){ mapSearchInfoWindow.close(); mapSearchInfoWindow=null; }
+  // 還原所有標記透明度
+  gmarkers.forEach(m=>m.setOpacity(1));
+}
+
+function highlightMarkers(ids){
+  gmarkers.forEach(m=>{
+    const nid = m.get('nid');
+    m.setOpacity(ids.includes(nid) ? 1 : 0.2);
+  });
+}
+
+function openMapInfo(n){
+  const color = CAT_COLORS[n.cat] || '#6B7280';
+  const cnt = db.records.filter(r=>r.nid===n.id).length;
+  const recBtn = cnt > 0
+    ? `<div style="margin-top:8px;"><button onclick="jumpHistFromMap('${n.id}','${n.name.replace(/'/g,'')}');return false;"
+        style="background:#1A5FA8;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:inherit;">
+        📋 查看 ${cnt} 筆互動記錄</button></div>`
+    : `<div style="font-size:12px;color:#A5A39C;margin-top:6px;">尚無互動記錄</div>`;
+  const navBtn = n.addr
+    ? `<div style="margin-top:6px;"><button onclick="openNav('${n.addr.replace(/'/g,'')}');return false;"
+        style="background:#34A853;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:inherit;">
+        🧭 導航到這裡</button></div>` : '';
+
+  if(!mapSearchInfoWindow) mapSearchInfoWindow = new google.maps.InfoWindow();
+  mapSearchInfoWindow.setContent(`
+    <div style="font-family:'Noto Sans TC',sans-serif;padding:4px;min-width:190px;">
+      <div style="font-weight:700;font-size:14px;margin-bottom:4px;">${n.name}</div>
+      <div style="font-size:12px;color:#68665E;margin-bottom:2px;">
+        <span style="background:${color};color:#fff;padding:1px 6px;border-radius:10px;font-size:10px;">${n.cat}</span>
+        &nbsp;${n.area}${n.sub?' · '+n.sub:''}
+      </div>
+      ${n.phone?`<div style="font-size:12px;margin-top:4px;">📞 ${n.phone}</div>`:''}
+      ${n.mobile?`<div style="font-size:12px;">📱 ${n.mobile}</div>`:''}
+      ${recBtn}${navBtn}
+    </div>`);
+  // 找到對應的marker
+  const marker = gmarkers.find(m=>m.get('nid')===n.id);
+  if(marker) mapSearchInfoWindow.open(gmap, marker);
+  else mapSearchInfoWindow.setPosition(geocache[n.id]);
 }
 
 function openNav(addr){
