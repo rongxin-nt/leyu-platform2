@@ -177,6 +177,8 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
 .mob-overlay.on{display:block;}
 @media(max-width:640px){.mobile-nav{display:block;}}
 </style>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCpc7FHkOiXZw6oNSbgkJrlXjoHNN1VcqQ&language=zh-TW" async defer></script>
 </head>
 <body>
@@ -194,6 +196,7 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
       <div class="nav-sec">查詢</div>
       <div class="nav on" onclick="go('search')" id="n-search">🔍 查詢資源單位</div>
       <div class="nav" onclick="go('map')" id="n-map">🗺️ 地圖檢視</div>
+      <div class="nav" onclick="go('map2')" id="n-map2">🗺️ 國土地圖</div>
       <div class="nav" onclick="go('hist')" id="n-hist">📋 歷史記錄</div>
       <div class="nav-sec">資料管理</div>
       <div class="nav" onclick="go('add')" id="n-add">➕ 新增資源單位</div>
@@ -246,8 +249,28 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
         <div id="map-container" style="width:100%;height:72vw;max-height:680px;min-height:420px;border-radius:var(--rl);overflow:hidden;border:1px solid var(--border);background:var(--bg);touch-action:pan-x pan-y;"></div>
       </div>
 
-      <!-- 歷史 -->
-      <div class="page" id="p-hist">
+      <!-- 國土地圖 -->
+      <div class="page" id="p-map2">
+        <div class="pg-title">國土地圖</div>
+        <div class="pg-desc">使用內政部國土測繪中心定位，準確度更高。地圖由 OpenStreetMap 提供。</div>
+        <div style="display:flex;gap:8px;margin-bottom:.75rem;flex-wrap:wrap;align-items:center;">
+          <div id="map2-cat-bar" style="display:flex;gap:6px;flex-wrap:wrap;flex:1;"></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:.75rem;flex-wrap:wrap;align-items:center;">
+          <div class="searchable-select" style="flex:1;min-width:180px;">
+            <input id="map2-search-kw" placeholder="搜尋單位名稱..." autocomplete="off"
+              style="width:100%;height:36px;border:1px solid var(--border2);border-radius:var(--r);background:var(--surface);color:var(--text);font-family:inherit;font-size:13px;padding:0 10px;outline:none;"
+              oninput="map2SearchSuggest()" onkeydown="if(event.key==='Enter'){closeMap2Suggest();map2Search();}" onfocus="map2SearchSuggest()" onblur="setTimeout(function(){closeMap2Suggest()},180)"/>
+            <div class="ss-dropdown" id="map2-search-dd"></div>
+          </div>
+          <button class="btn btn-p" onclick="map2Search()">🔍 查詢</button>
+          <button class="btn" onclick="map2SearchClear()">清除</button>
+          <button class="btn btn-sm" onclick="geocodeAllNtpc()" style="margin-left:auto;">📍 國土重新定位</button>
+        </div>
+        <div id="map2-legend" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:.75rem;font-size:12px;"></div>
+        <div id="map2-status" style="font-size:12px;color:var(--hint);margin-bottom:.5rem;"></div>
+        <div id="map2-container" style="width:100%;height:72vw;max-height:680px;min-height:420px;border-radius:var(--rl);overflow:hidden;border:1px solid var(--border);background:var(--bg);"></div>
+      </div>
         <div class="pg-title">歷史互動記錄</div>
         <div class="pg-desc">查詢所有社工與資源單位的互動記錄。</div>
         <div class="sbar">
@@ -750,7 +773,7 @@ function go(p){
   const nav=document.getElementById('n-'+p);
   if(nav) nav.classList.add('on');
   updateMobNav(p);
-  const fn={search:()=>{searchPage=1;renderSearch();},hist:()=>{histPage=1;renderHist();},map:initMapPage,stats:renderStats,mgmt:()=>{mgmtPage=1;renderMgmt();},rec:initRecForm,visit:initVisitForm,import:resetImport,add:clearAdd};
+  const fn={search:()=>{searchPage=1;renderSearch();},hist:()=>{histPage=1;renderHist();},map:initMapPage,map2:initMap2Page,stats:renderStats,mgmt:()=>{mgmtPage=1;renderMgmt();},rec:initRecForm,visit:initVisitForm,import:resetImport,add:clearAdd};
   if(fn[p]) fn[p]();
   populateFilters();
 }
@@ -1897,6 +1920,190 @@ function initMapPage(){
 function showLoading(on){
   const el=document.getElementById('loading-overlay');
   if(el) el.classList.toggle('on',on);
+}
+
+// ══════════════════════════════
+// ★ 國土地圖（Leaflet + 國土測繪 API）
+// ══════════════════════════════
+const NTPC_CACHE_KEY = 'leyu_ntpccache_v1';
+const NTPC_GEOCODE_URL = 'https://geocode.moi.gov.tw/geoapi/v1/act/ADDR';
+let ntpcCache = {};
+let leafletMap = null;
+let leafletMarkers = [];
+let map2CurCat = 'all';
+
+function loadNtpcCache(){
+  try{ const r=localStorage.getItem(NTPC_CACHE_KEY); if(r) ntpcCache=JSON.parse(r); }catch(e){}
+}
+function saveNtpcCache(){
+  try{ localStorage.setItem(NTPC_CACHE_KEY, JSON.stringify(ntpcCache)); }catch(e){}
+}
+
+async function ntpcGeocode(addr){
+  if(!addr||addr.length<5) return null;
+  if(ntpcCache[addr]) return ntpcCache[addr];
+  try{
+    const url=`https://geocode.moi.gov.tw/geoapi/v1/act/ADDR?addr=${encodeURIComponent(addr)}&format=json`;
+    const res=await fetch(url);
+    if(!res.ok) return null;
+    const data=await res.json();
+    if(data&&data.length>0&&data[0].x&&data[0].y){
+      const pos={lat:parseFloat(data[0].y),lng:parseFloat(data[0].x)};
+      ntpcCache[addr]=pos; saveNtpcCache(); return pos;
+    }
+  }catch(e){ console.error('國土定位失敗:',addr,e); }
+  return null;
+}
+
+function initLeafletMap(){
+  if(leafletMap) return;
+  leafletMap=L.map('map2-container').setView([25.083,121.468],13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',maxZoom:19
+  }).addTo(leafletMap);
+  leafletMap.on('click',()=>{ leafletMap.closePopup(); leafletMarkers.forEach(m=>m.setOpacity(1)); });
+}
+
+async function geocodeAllNtpc(){
+  const nets=db.networks.filter(n=>n.addr&&n.addr.length>4);
+  const uncached=nets.filter(n=>!ntpcCache[n.addr]);
+  if(!uncached.length){ renderMap2Markers(); return; }
+  document.getElementById('map2-status').textContent=`正在定位 ${uncached.length} 個地址（國土）...`;
+  let done=0;
+  for(const n of uncached){
+    await ntpcGeocode(n.addr); done++;
+    document.getElementById('map2-status').textContent=`定位中 ${done}/${uncached.length}...`;
+    await new Promise(r=>setTimeout(r,150));
+  }
+  saveNtpcCache();
+  document.getElementById('map2-status').textContent=`已定位 ${Object.keys(ntpcCache).length} 個地址`;
+  renderMap2Markers();
+}
+
+function renderMap2Markers(){
+  if(!leafletMap) return;
+  leafletMarkers.forEach(m=>leafletMap.removeLayer(m));
+  leafletMarkers=[];
+  const nets=db.networks.filter(n=>{
+    if(map2CurCat!=='all'&&n.cat!==map2CurCat) return false;
+    return ntpcCache[n.addr];
+  });
+  const bounds=[];
+  nets.forEach(n=>{
+    const pos=ntpcCache[n.addr]; if(!pos) return;
+    const color=CAT_COLORS[n.cat]||'#6B7280';
+    const cnt=db.records.filter(r=>r.nid===n.id).length;
+    const icon=L.divIcon({
+      className:'',
+      html:`<div style="width:20px;height:20px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3);"></div>`,
+      iconSize:[20,20],iconAnchor:[10,10]
+    });
+    const recBtn=cnt>0
+      ?`<div style="margin-top:8px;"><button onclick="jumpHistFromMap('${n.id}','${n.name.replace(/'/g,'')}');return false;" style="background:#1A5FA8;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:inherit;">📋 查看 ${cnt} 筆互動記錄</button></div>`
+      :`<div style="font-size:12px;color:#A5A39C;margin-top:6px;">尚無互動記錄</div>`;
+    const navBtn=n.addr?`<div style="margin-top:6px;"><button onclick="openNav('${n.addr.replace(/'/g,'')}');return false;" style="background:#34A853;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:inherit;">🧭 導航到這裡</button></div>`:'';
+    const marker=L.marker([pos.lat,pos.lng],{icon,title:n.name}).addTo(leafletMap);
+    marker.nid=n.id;
+    marker.bindPopup(`<div style="font-family:'Noto Sans TC',sans-serif;min-width:180px;">
+      <div style="font-weight:700;font-size:14px;margin-bottom:4px;">${n.name}</div>
+      <div style="font-size:12px;color:#68665E;margin-bottom:2px;">
+        <span style="background:${color};color:#fff;padding:1px 6px;border-radius:10px;font-size:10px;">${n.cat}</span>
+        &nbsp;${n.area}${n.sub?' · '+n.sub:''}
+      </div>
+      ${n.phone?`<div style="font-size:12px;margin-top:4px;">📞 ${n.phone}</div>`:''}
+      ${n.mobile?`<div style="font-size:12px;">📱 ${n.mobile}</div>`:''}
+      ${recBtn}${navBtn}
+    </div>`,{maxWidth:240});
+    marker.on('click',()=>{ highlightMap2Markers([n.id]); });
+    leafletMarkers.push(marker); bounds.push([pos.lat,pos.lng]);
+  });
+  if(bounds.length>0) leafletMap.fitBounds(bounds,{padding:[20,20]});
+  document.getElementById('map2-status').textContent=`顯示 ${leafletMarkers.length} 個資源單位`;
+}
+
+function highlightMap2Markers(ids){
+  leafletMarkers.forEach(m=>m.setOpacity(ids.includes(m.nid)?1:0.2));
+}
+
+function renderMap2CatBar(){
+  const bar=document.getElementById('map2-cat-bar'); if(!bar) return;
+  bar.innerHTML=`<button class="ttype ${map2CurCat==='all'?'on':''}" onclick="setMap2Cat('all',this)">全部</button>`;
+  UNIT_CATS.forEach(c=>{if(db.networks.some(n=>n.cat===c)) bar.innerHTML+=`<button class="ttype ${map2CurCat===c?'on':''}" onclick="setMap2Cat('${c}',this)">${c}</button>`;});
+}
+
+function setMap2Cat(cat,el){
+  map2CurCat=cat;
+  document.querySelectorAll('#map2-cat-bar .ttype').forEach(x=>x.classList.remove('on'));
+  el.classList.add('on'); renderMap2Markers();
+}
+
+function renderMap2Legend(){
+  const el=document.getElementById('map2-legend'); if(!el) return;
+  el.innerHTML=UNIT_CATS.filter(c=>db.networks.some(n=>n.cat===c)).map(c=>`
+    <div style="display:flex;align-items:center;gap:4px;">
+      <div style="width:12px;height:12px;border-radius:50%;background:${CAT_COLORS[c]||'#6B7280'};flex-shrink:0;"></div>
+      <span>${c}</span>
+    </div>`).join('');
+}
+
+function map2SearchSuggest(){
+  const kw=(document.getElementById('map2-search-kw').value||'').trim().toLowerCase();
+  const dd=document.getElementById('map2-search-dd');
+  if(!kw){dd.classList.remove('on');dd.innerHTML='';return;}
+  const results=db.networks.filter(n=>(n.name||'').toLowerCase().includes(kw)||(n.sub||'').toLowerCase().includes(kw)||(n.area||'').toLowerCase().includes(kw));
+  if(!results.length){dd.classList.remove('on');dd.innerHTML='';return;}
+  dd.innerHTML=results.map(n=>`
+    <div class="ss-option" onmousedown="selectMap2Suggest('${n.id}','${(n.area+' '+(n.sub||'')+' '+n.name).replace(/'/g,'').trim()}')">
+      <span style="font-size:11px;color:var(--hint);">${n.area} ${n.sub||''}</span>
+      <span style="margin-left:4px;font-weight:500;">${n.name}</span>
+      <span class="badge b-amber" style="font-size:10px;margin-left:6px;">${n.cat}</span>
+      ${!ntpcCache[n.addr]?'<span style="font-size:10px;color:var(--hint);margin-left:4px;">（未定位）</span>':''}
+    </div>`).join('');
+  dd.classList.add('on');
+}
+
+function closeMap2Suggest(){
+  const dd=document.getElementById('map2-search-dd'); if(dd) dd.classList.remove('on');
+}
+
+function selectMap2Suggest(nid,label){
+  document.getElementById('map2-search-kw').value=label;
+  closeMap2Suggest();
+  const n=db.networks.find(x=>x.id===nid); if(!n) return;
+  if(!ntpcCache[n.addr]){document.getElementById('map2-status').textContent=`「${n.name}」尚未定位，請先點「國土重新定位」`;return;}
+  const pos=ntpcCache[n.addr];
+  leafletMap.setView([pos.lat,pos.lng],17);
+  const marker=leafletMarkers.find(m=>m.nid===nid);
+  if(marker){marker.openPopup();highlightMap2Markers([nid]);}
+  document.getElementById('map2-status').textContent=`已找到：${n.name}`;
+}
+
+function map2Search(){
+  const kw=(document.getElementById('map2-search-kw').value||'').trim().toLowerCase();
+  closeMap2Suggest();
+  if(!kw){map2SearchClear();return;}
+  const results=db.networks.filter(n=>((n.name||'').toLowerCase().includes(kw)||(n.sub||'').toLowerCase().includes(kw)||(n.area||'').toLowerCase().includes(kw))&&ntpcCache[n.addr]);
+  if(!results.length){document.getElementById('map2-status').textContent=`找不到「${kw}」`;return;}
+  if(results.length===1){selectMap2Suggest(results[0].id,results[0].name);}
+  else{
+    const bounds=results.map(n=>ntpcCache[n.addr]).filter(Boolean).map(p=>[p.lat,p.lng]);
+    if(bounds.length) leafletMap.fitBounds(bounds,{padding:[20,20]});
+    highlightMap2Markers(results.map(n=>n.id));
+    document.getElementById('map2-status').textContent=`找到 ${results.length} 筆符合「${kw}」的單位`;
+  }
+}
+
+function map2SearchClear(){
+  document.getElementById('map2-search-kw').value='';
+  leafletMap.closePopup();
+  leafletMarkers.forEach(m=>m.setOpacity(1));
+  document.getElementById('map2-status').textContent=`顯示 ${leafletMarkers.length} 個資源單位`;
+}
+
+function initMap2Page(){
+  renderMap2CatBar(); renderMap2Legend(); loadNtpcCache();
+  if(!leafletMap){ initLeafletMap(); geocodeAllNtpc(); }
+  else{ renderMap2Markers(); setTimeout(()=>leafletMap.invalidateSize(),100); }
 }
 
 // ── 手機導覽 ──
