@@ -1725,6 +1725,13 @@ function renderMarkers(){
            </div>`
         : '';
 
+      const fixBtn = `<div style="margin-top:6px;">
+        <button onclick="startFixPos('${n.id}','${n.name.replace(/'/g,'')}');return false;"
+          style="background:#6B7280;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:inherit;">
+          📌 修正位置
+        </button>
+       </div>`;
+
       infoWindow.setContent(`
         <div style="font-family:'Noto Sans TC',sans-serif;padding:4px;min-width:190px;">
           <div style="font-weight:700;font-size:14px;margin-bottom:4px;">${n.name}</div>
@@ -1736,6 +1743,7 @@ function renderMarkers(){
           ${n.mobile?`<div style="font-size:12px;">📱 ${n.mobile}</div>`:''}
           ${recBtn}
           ${navBtn}
+          ${fixBtn}
         </div>`);
       infoWindow.open(gmap, marker);
     });
@@ -1745,6 +1753,43 @@ function renderMarkers(){
   });
 
   if(gmarkers.length > 0) gmap.fitBounds(bounds);
+  document.getElementById('map-status').textContent = `顯示 ${gmarkers.length} 個資源單位`;
+}
+
+// ── 修正位置 ──
+let fixPosNid = null;
+let fixPosListener = null;
+
+function startFixPos(nid, name){
+  fixPosNid = nid;
+  infoWindow.close();
+  // 改變游標提示使用者點選正確位置
+  gmap.setOptions({draggableCursor:'crosshair'});
+  document.getElementById('map-status').innerHTML =
+    `<span style="color:var(--amber-d);font-weight:500;">📌 修正模式：請在地圖上點擊「${name}」的正確位置</span>
+     <button class="btn btn-sm" onclick="cancelFixPos()" style="margin-left:8px;">取消</button>`;
+  // 監聽地圖點擊
+  if(fixPosListener) google.maps.event.removeListener(fixPosListener);
+  fixPosListener = gmap.addListener('click', function(e){
+    const lat = e.latLng.lat();
+    const lng = e.latLng.lng();
+    const n = db.networks.find(x=>x.id===fixPosNid);
+    if(!n) return;
+    // 更新快取
+    geocache[fixPosNid] = {lat, lng};
+    saveGeoCache();
+    // 結束修正模式
+    cancelFixPos();
+    // 重新渲染標記
+    renderMarkers();
+    document.getElementById('map-status').textContent = `✓「${name}」位置已修正並儲存！`;
+  });
+}
+
+function cancelFixPos(){
+  fixPosNid = null;
+  if(fixPosListener){ google.maps.event.removeListener(fixPosListener); fixPosListener=null; }
+  gmap.setOptions({draggableCursor:null});
   document.getElementById('map-status').textContent = `顯示 ${gmarkers.length} 個資源單位`;
 }
 
