@@ -493,8 +493,8 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
         </div>
         <div class="sbar">
           <input id="m-kw" placeholder="搜尋單位名稱..." oninput="mgmtPage=1;renderMgmt()"/>
-          <select id="m-cat" onchange="mgmtPage=1;renderMgmt()"><option value="">全部單位別</option></select>
-          <select id="m-area" onchange="mgmtPage=1;renderMgmt()"><option value="">全部地區</option></select>
+          <select id="m-filter-cat" onchange="mgmtPage=1;renderMgmt()"><option value="">全部單位別</option></select>
+          <select id="m-area-mgmt" onchange="mgmtPage=1;renderMgmt()"><option value="">全部地區</option></select>
           <select id="m-worker" onchange="mgmtPage=1;renderMgmt()"><option value="">全部社工</option></select>
         </div>
         <div class="rmeta" id="m-meta"></div>
@@ -1352,9 +1352,9 @@ let mgmtPage = 1;
 
 function populateMgmtFilters(){
   const areas=[...new Set(db.networks.map(n=>n.area).filter(Boolean))].sort((a,b)=>strokeSort(a,b));
-  const mArea=document.getElementById('m-area');
+  const mArea=document.getElementById('m-area-mgmt');
   if(mArea){ const cur=mArea.value; while(mArea.options.length>1) mArea.remove(1); areas.forEach(a=>mArea.add(new Option(a,a))); mArea.value=cur; }
-  const mCat=document.getElementById('m-cat');
+  const mCat=document.getElementById('m-filter-cat');
   if(mCat){ const cur=mCat.value; while(mCat.options.length>1) mCat.remove(1); UNIT_CATS.forEach(c=>mCat.add(new Option(c,c))); mCat.value=cur; }
   const workers=[...new Set(db.records.map(r=>r.worker).filter(Boolean))].sort((a,b)=>strokeSort(a,b));
   const mWorker=document.getElementById('m-worker');
@@ -1364,7 +1364,7 @@ function populateMgmtFilters(){
 function renderMgmt(){
   populateMgmtFilters();
   const kw=(document.getElementById('m-kw')||{}).value?.toLowerCase()||'';
-  const cat=gv('m-cat'), area=gv('m-area'), worker=gv('m-worker');
+  const cat=gv('m-filter-cat'), area=gv('m-area-mgmt'), worker=gv('m-worker');
 
   let nets=sortByStroke(db.networks,'name').filter(n=>{
     if(kw&&!(n.name.toLowerCase().includes(kw)||(n.sub||'').toLowerCase().includes(kw))) return false;
