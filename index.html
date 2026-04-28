@@ -177,8 +177,6 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
 .mob-overlay.on{display:block;}
 @media(max-width:640px){.mobile-nav{display:block;}}
 </style>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCpc7FHkOiXZw6oNSbgkJrlXjoHNN1VcqQ&language=zh-TW" async defer></script>
 </head>
 <body>
@@ -196,7 +194,6 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
       <div class="nav-sec">查詢</div>
       <div class="nav on" onclick="go('search')" id="n-search">🔍 查詢資源單位</div>
       <div class="nav" onclick="go('map')" id="n-map">🗺️ 地圖檢視</div>
-      <div class="nav" onclick="go('map2')" id="n-map2">🗺️ 國土地圖</div>
       <div class="nav" onclick="go('hist')" id="n-hist">📋 歷史記錄</div>
       <div class="nav-sec">資料管理</div>
       <div class="nav" onclick="go('add')" id="n-add">➕ 新增資源單位</div>
@@ -249,28 +246,8 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
         <div id="map-container" style="width:100%;height:72vw;max-height:680px;min-height:420px;border-radius:var(--rl);overflow:hidden;border:1px solid var(--border);background:var(--bg);touch-action:pan-x pan-y;"></div>
       </div>
 
-      <!-- 國土地圖 -->
-      <div class="page" id="p-map2">
-        <div class="pg-title">國土地圖</div>
-        <div class="pg-desc">使用 OpenStreetMap Nominatim 定位，地圖由 OpenStreetMap 提供。第一次定位需要較長時間，請耐心等待。</div>
-        <div style="display:flex;gap:8px;margin-bottom:.75rem;flex-wrap:wrap;align-items:center;">
-          <div id="map2-cat-bar" style="display:flex;gap:6px;flex-wrap:wrap;flex:1;"></div>
-        </div>
-        <div style="display:flex;gap:8px;margin-bottom:.75rem;flex-wrap:wrap;align-items:center;">
-          <div class="searchable-select" style="flex:1;min-width:180px;">
-            <input id="map2-search-kw" placeholder="搜尋單位名稱..." autocomplete="off"
-              style="width:100%;height:36px;border:1px solid var(--border2);border-radius:var(--r);background:var(--surface);color:var(--text);font-family:inherit;font-size:13px;padding:0 10px;outline:none;"
-              oninput="map2SearchSuggest()" onkeydown="if(event.key==='Enter'){closeMap2Suggest();map2Search();}" onfocus="map2SearchSuggest()" onblur="setTimeout(function(){closeMap2Suggest()},180)"/>
-            <div class="ss-dropdown" id="map2-search-dd"></div>
-          </div>
-          <button class="btn btn-p" onclick="map2Search()">🔍 查詢</button>
-          <button class="btn" onclick="map2SearchClear()">清除</button>
-          <button class="btn btn-sm" onclick="geocodeAllNtpc()" style="margin-left:auto;">📍 國土重新定位</button>
-        </div>
-        <div id="map2-legend" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:.75rem;font-size:12px;"></div>
-        <div id="map2-status" style="font-size:12px;color:var(--hint);margin-bottom:.5rem;"></div>
-        <div id="map2-container" style="width:100%;height:72vw;max-height:680px;min-height:420px;border-radius:var(--rl);overflow:hidden;border:1px solid var(--border);background:var(--bg);"></div>
-      </div>
+      <!-- 歷史 -->
+      <div class="page" id="p-hist">
         <div class="pg-title">歷史互動記錄</div>
         <div class="pg-desc">查詢所有社工與資源單位的互動記錄。</div>
         <div class="sbar">
@@ -773,7 +750,7 @@ function go(p){
   const nav=document.getElementById('n-'+p);
   if(nav) nav.classList.add('on');
   updateMobNav(p);
-  const fn={search:()=>{searchPage=1;renderSearch();},hist:()=>{histPage=1;renderHist();},map:initMapPage,map2:initMap2Page,stats:renderStats,mgmt:()=>{mgmtPage=1;renderMgmt();},rec:initRecForm,visit:initVisitForm,import:resetImport,add:clearAdd};
+  const fn={search:()=>{searchPage=1;renderSearch();},hist:()=>{histPage=1;renderHist();},map:initMapPage,stats:renderStats,mgmt:()=>{mgmtPage=1;renderMgmt();},rec:initRecForm,visit:initVisitForm,import:resetImport,add:clearAdd};
   if(fn[p]) fn[p]();
   populateFilters();
 }
@@ -1573,6 +1550,7 @@ let gmap = null;
 let gmarkers = [];
 let geocache = {};
 let mapCurCat = 'all';
+let gInfoWindow = null;
 
 function loadGeoCache(){
   try{ const r=localStorage.getItem(GEO_CACHE_KEY); if(r) geocache=JSON.parse(r); }catch(e){}
@@ -1669,11 +1647,11 @@ function renderMarkers(){
   gmarkers = [];
   if(!gmap) return;
 
-  const infoWindow = new google.maps.InfoWindow();
+  if(!gInfoWindow) gInfoWindow = new google.maps.InfoWindow();
 
   // 點地圖空白處關閉 infoWindow 並還原標記
   gmap.addListener('click', ()=>{
-    infoWindow.close();
+    gInfoWindow.close();
     if(mapSearchInfoWindow) mapSearchInfoWindow.close();
     gmarkers.forEach(m=>m.setOpacity(1));
   });
@@ -1732,7 +1710,7 @@ function renderMarkers(){
         </button>
        </div>`;
 
-      infoWindow.setContent(`
+      gInfoWindow.setContent(`
         <div style="font-family:'Noto Sans TC',sans-serif;padding:4px;min-width:190px;">
           <div style="font-weight:700;font-size:14px;margin-bottom:4px;">${n.name}</div>
           <div style="font-size:12px;color:#68665E;margin-bottom:2px;">
@@ -1745,7 +1723,7 @@ function renderMarkers(){
           ${navBtn}
           ${fixBtn}
         </div>`);
-      infoWindow.open(gmap, marker);
+      gInfoWindow.open(gmap, marker);
     });
 
     gmarkers.push(marker);
@@ -1760,29 +1738,43 @@ function renderMarkers(){
 let fixPosNid = null;
 let fixPosListener = null;
 
+async function loadGeoFixes(){
+  try{
+    const res = await sbFetch('geo_fixes','GET',null,'?select=*');
+    if(res && res.length){
+      res.forEach(r=>{ geocache[r.nid]={lat:r.lat,lng:r.lng}; });
+      saveGeoCache();
+    }
+  }catch(e){ console.error('載入修正位置失敗',e); }
+}
+
 function startFixPos(nid, name){
   fixPosNid = nid;
-  infoWindow.close();
-  // 改變游標提示使用者點選正確位置
+  gInfoWindow.close();
   gmap.setOptions({draggableCursor:'crosshair'});
   document.getElementById('map-status').innerHTML =
     `<span style="color:var(--amber-d);font-weight:500;">📌 修正模式：請在地圖上點擊「${name}」的正確位置</span>
      <button class="btn btn-sm" onclick="cancelFixPos()" style="margin-left:8px;">取消</button>`;
-  // 監聽地圖點擊
   if(fixPosListener) google.maps.event.removeListener(fixPosListener);
-  fixPosListener = gmap.addListener('click', function(e){
+  fixPosListener = gmap.addListener('click', async function(e){
     const lat = e.latLng.lat();
     const lng = e.latLng.lng();
     const n = db.networks.find(x=>x.id===fixPosNid);
     if(!n) return;
-    // 更新快取
+    // 存到本機快取
     geocache[fixPosNid] = {lat, lng};
     saveGeoCache();
-    // 結束修正模式
+    // 存到Supabase（所有人共用）
+    try{
+      await sbFetch('geo_fixes','POST',{nid:fixPosNid,lat,lng},'');
+    }catch(e){
+      // 如果已存在就改用PATCH更新
+      try{ await sbFetch('geo_fixes','PATCH',{lat,lng},`?nid=eq.${fixPosNid}`); }
+      catch(e2){ console.error('儲存修正位置失敗',e2); }
+    }
     cancelFixPos();
-    // 重新渲染標記
     renderMarkers();
-    document.getElementById('map-status').textContent = `✓「${name}」位置已修正並儲存！`;
+    document.getElementById('map-status').textContent = `✓「${name}」位置已修正，所有人都會看到更新！`;
   });
 }
 
@@ -2205,6 +2197,7 @@ function updateMobSuperItems(){
 async function init(){
   showLoading(true);
   await loadFromDB();
+  await loadGeoFixes();
   showLoading(false);
   populateFilters();
   renderSearch();
