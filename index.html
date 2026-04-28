@@ -252,7 +252,7 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
       <!-- 國土地圖 -->
       <div class="page" id="p-map2">
         <div class="pg-title">國土地圖</div>
-        <div class="pg-desc">使用內政部國土測繪中心定位，準確度更高。地圖由 OpenStreetMap 提供。</div>
+        <div class="pg-desc">使用 OpenStreetMap Nominatim 定位，地圖由 OpenStreetMap 提供。第一次定位需要較長時間，請耐心等待。</div>
         <div style="display:flex;gap:8px;margin-bottom:.75rem;flex-wrap:wrap;align-items:center;">
           <div id="map2-cat-bar" style="display:flex;gap:6px;flex-wrap:wrap;flex:1;"></div>
         </div>
@@ -1943,12 +1943,12 @@ async function ntpcGeocode(addr){
   if(!addr||addr.length<5) return null;
   if(ntpcCache[addr]) return ntpcCache[addr];
   try{
-    const url=`https://geocode.moi.gov.tw/geoapi/v1/act/ADDR?addr=${encodeURIComponent(addr)}&format=json`;
-    const res=await fetch(url);
+    const url=`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addr)}&format=json&limit=1&accept-language=zh-TW&countrycodes=tw`;
+    const res=await fetch(url, {headers:{'Accept-Language':'zh-TW'}});
     if(!res.ok) return null;
     const data=await res.json();
-    if(data&&data.length>0&&data[0].x&&data[0].y){
-      const pos={lat:parseFloat(data[0].y),lng:parseFloat(data[0].x)};
+    if(data&&data.length>0){
+      const pos={lat:parseFloat(data[0].lat),lng:parseFloat(data[0].lon)};
       ntpcCache[addr]=pos; saveNtpcCache(); return pos;
     }
   }catch(e){ console.error('國土定位失敗:',addr,e); }
@@ -1973,7 +1973,7 @@ async function geocodeAllNtpc(){
   for(const n of uncached){
     await ntpcGeocode(n.addr); done++;
     document.getElementById('map2-status').textContent=`定位中 ${done}/${uncached.length}...`;
-    await new Promise(r=>setTimeout(r,150));
+    await new Promise(r=>setTimeout(r,1100));
   }
   saveNtpcCache();
   document.getElementById('map2-status').textContent=`已定位 ${Object.keys(ntpcCache).length} 個地址`;
