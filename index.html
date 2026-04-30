@@ -1651,6 +1651,15 @@ function setMapCat(cat, el){
 }
 
 async function geocodeAndRender(){
+  // 先從Supabase載入已有的定位結果
+  try{
+    const sbCache = await sbFetch('geo_cache','GET',null,'?select=*');
+    if(sbCache && sbCache.length){
+      sbCache.forEach(r=>{ geocache[r.nid]={lat:r.lat,lng:r.lng}; });
+      saveGeoCache();
+    }
+  }catch(e){ console.log('從Supabase載入定位快取失敗，使用本機快取'); }
+
   const nets = db.networks.filter(n=>n.addr&&n.addr.length>4);
   const uncached = nets.filter(n=>!geocache[n.id]);
   if(uncached.length===0){ renderMarkers(); return; }
@@ -1661,14 +1670,22 @@ async function geocodeAndRender(){
 
   for(const n of uncached){
     await new Promise(resolve=>{
-      geocoder.geocode({address: n.addr, region:'TW'}, (results, status)=>{
+      geocoder.geocode({address: n.addr, region:'TW'}, async (results, status)=>{
         if(status==='OK' && results[0]){
           const loc = results[0].geometry.location;
-          geocache[n.id] = {lat: loc.lat(), lng: loc.lng()};
+          const pos = {lat: loc.lat(), lng: loc.lng()};
+          geocache[n.id] = pos;
+          // 存到Supabase讓所有裝置共用
+          try{
+            await sbFetch('geo_cache','POST',{nid:n.id,lat:pos.lat,lng:pos.lng},'');
+          }catch(e){
+            try{ await sbFetch('geo_cache','PATCH',{lat:pos.lat,lng:pos.lng},`?nid=eq.${n.id}`); }
+            catch(e2){}
+          }
         }
         done++;
         document.getElementById('map-status').textContent = `定位中 ${done}/${uncached.length}...`;
-        setTimeout(resolve, 120); // 避免超過 API 速率限制
+        setTimeout(resolve, 120);
       });
     });
   }
@@ -1678,8 +1695,12 @@ async function geocodeAndRender(){
 }
 
 async function geocodeAll(){
+  showLoading(true);
+  // 清空本機和Supabase快取
   geocache = {};
   saveGeoCache();
+  try{ await sbFetch('geo_cache','DELETE',null,'?nid=neq.null'); }catch(e){}
+  showLoading(false);
   gmarkers.forEach(m=>m.setMap(null));
   gmarkers = [];
   document.getElementById('map-status').textContent = '清除快取，重新定位...';
