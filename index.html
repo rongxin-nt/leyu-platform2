@@ -539,6 +539,48 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
     </button>
   </div>
 </nav>
+<!-- 編輯互動記錄 Modal -->
+<div class="overlay" id="edit-rec-modal">
+  <div class="modal" style="width:520px;">
+    <button class="modal-close" onclick="closeEditRec()">✕</button>
+    <div class="modal-title">編輯互動記錄</div>
+    <div class="frow">
+      <div class="fg"><label class="flabel">類型</label>
+        <select id="er-type">
+          <option value="rec">合作記事</option>
+          <option value="visit">里長拜會</option>
+        </select>
+      </div>
+      <div class="fg"><label class="flabel">日期</label>
+        <input type="date" id="er-date"/>
+      </div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="flabel">社工姓名</label>
+        <input id="er-worker" placeholder="請輸入社工姓名"/>
+      </div>
+      <div class="fg"><label class="flabel">互動方式</label>
+        <select id="er-method">
+          <option value="">—</option>
+          <option>親自拜訪</option>
+          <option>電話聯繫</option>
+          <option>LINE訊息</option>
+          <option>其他</option>
+        </select>
+      </div>
+    </div>
+    <div class="frow full">
+      <div class="fg"><label class="flabel">內容</label>
+        <textarea id="er-content" style="min-height:120px;"></textarea>
+      </div>
+    </div>
+    <div class="factions">
+      <button class="btn btn-p" onclick="saveEditRec()">儲存</button>
+      <button class="btn" onclick="closeEditRec()">取消</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="pwd-modal">
   <div class="modal" style="width:360px;">
     <div class="modal-title">🔐 督導模式驗證</div>
@@ -1390,14 +1432,17 @@ function renderMgmt(){
   if(!pageNets.length){c.innerHTML='<div class="empty">找不到符合的資源單位</div>';renderMgmtPagination(0,1);return;}
   c.innerHTML=`<div class="hlist">${pageNets.map(n=>{
     const recs=db.records.filter(r=>r.nid===n.id).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-    const recSummary=recs.length?recs.slice(0,3).map(r=>`<div style="font-size:11px;color:var(--sub);padding:3px 0;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:8px;">
+    const recSummary=recs.length?recs.map(r=>`<div style="font-size:11px;color:var(--sub);padding:3px 0;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:8px;">
       <div style="flex:1;">
         <span class="badge ${r.type==='visit'?'b-green':'b-blue'}" style="font-size:10px;">${r.type==='visit'?'拜會':'記事'}</span>
         <span style="margin-left:4px;">${r.date||''}</span>
         <span style="color:var(--hint);margin-left:6px;">社工：${r.worker||'—'}</span>
         <div style="color:var(--text);margin-top:2px;line-height:1.5;">${r.content.slice(0,50)}${r.content.length>50?'…':''}</div>
       </div>
-      <button class="btn btn-sm" style="flex-shrink:0;margin-top:2px;" onclick="editRecWorker('${r.id}','${(r.worker||'').replace(/'/g,'')}')">改社工</button>
+      <div style="display:flex;gap:4px;flex-shrink:0;margin-top:2px;">
+        <button class="btn btn-sm" onclick="openEditRec('${r.id}')">編輯</button>
+        <button class="btn btn-sm" style="color:var(--red);border-color:var(--red);" onclick="deleteRec('${r.id}')">刪除</button>
+      </div>
     </div>`).join(''):'';
     return `<div class="hitem">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:${recs.length?'8px':'0'};">
@@ -1417,7 +1462,6 @@ function renderMgmt(){
         </div>
       </div>
       ${recSummary}
-      ${recs.length>3?`<div style="font-size:11px;color:var(--hint);padding-top:4px;">還有 ${recs.length-3} 筆記錄...</div>`:''}
     </div>`;
   }).join('')}</div>`;
   renderMgmtPagination(total,totalPages);
@@ -1732,6 +1776,58 @@ function renderMarkers(){
 
   if(gmarkers.length > 0) gmap.fitBounds(bounds);
   document.getElementById('map-status').textContent = `顯示 ${gmarkers.length} 個資源單位`;
+}
+
+// ── 編輯互動記錄 ──
+let editRecId = null;
+
+function openEditRec(rid){
+  const r = db.records.find(x=>x.id===rid);
+  if(!r) return;
+  editRecId = rid;
+  document.getElementById('er-type').value = r.type||'rec';
+  document.getElementById('er-date').value = (r.date||'').replace(/\//g,'-');
+  document.getElementById('er-worker').value = r.worker||'';
+  document.getElementById('er-method').value = r.method||'';
+  document.getElementById('er-content').value = r.content||'';
+  document.getElementById('edit-rec-modal').classList.add('on');
+}
+
+function closeEditRec(){
+  editRecId = null;
+  document.getElementById('edit-rec-modal').classList.remove('on');
+}
+
+async function saveEditRec(){
+  if(!editRecId) return;
+  const type = document.getElementById('er-type').value;
+  const date = (document.getElementById('er-date').value||'').replace(/-/g,'/');
+  const worker = document.getElementById('er-worker').value.trim();
+  const method = document.getElementById('er-method').value;
+  const content = document.getElementById('er-content').value.trim();
+  if(!content){ alert('請填寫內容'); return; }
+  showLoading(true);
+  try{
+    await sbFetch('records','PATCH',{type,date,worker,method,content},`?id=eq.${editRecId}`);
+    const rec = db.records.find(r=>r.id===editRecId);
+    if(rec){ rec.type=type; rec.date=date; rec.worker=worker; rec.method=method; rec.content=content; }
+    closeEditRec();
+    renderMgmt();
+    populateFilters();
+  }catch(e){ alert('儲存失敗：'+e.message); }
+  showLoading(false);
+}
+
+async function deleteRec(rid){
+  if(!confirm('確定要刪除這筆互動記錄？')) return;
+  showLoading(true);
+  try{
+    await sbFetch('records','DELETE',null,`?id=eq.${rid}`);
+    db.records = db.records.filter(r=>r.id!==rid);
+    renderMgmt();
+    populateFilters();
+  }catch(e){ alert('刪除失敗：'+e.message); }
+  showLoading(false);
 }
 
 // ── 修正位置 ──
