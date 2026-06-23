@@ -178,6 +178,8 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
 @media(max-width:640px){.mobile-nav{display:block;}}
 </style>
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCpc7FHkOiXZw6oNSbgkJrlXjoHNN1VcqQ&language=zh-TW" async defer></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
 <div class="app">
@@ -610,8 +612,17 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:
 // ══════════════════════════════
 // ★ 設定區 ★
 const SUPER_PASSWORD = '72965262';
-const SB_URL = 'https://niumokiwqeltnjsmbpud.supabase.co';
-const SB_KEY = 'sb_publishable_l-WTIo_sUuUv3vwFNXFhjA_n4e40L37';
+const firebaseConfig = {
+  apiKey: "AIzaSyCH4zv08ikhf69UbiIePeISC4TqsN9sf5Q",
+  authDomain: "rongxin-nt.firebaseapp.com",
+  projectId: "rongxin-nt",
+  storageBucket: "rongxin-nt.firebasestorage.app",
+  messagingSenderId: "490264515618",
+  appId: "1:490264515618:web:98a0ac9cb3257ba961e67b",
+  measurementId: "G-99V08YC2TZ"
+};
+firebase.initializeApp(firebaseConfig);
+const fsdb = firebase.firestore();
 // ══════════════════════════════
 
 const UNIT_CATS = ['里長','社政單位','衛政單位','長照單位','勞政單位','警政單位','司法單位','民間資源','其他'];
@@ -623,79 +634,59 @@ let parsedRows = [];
 let conflictMode = null;
 let isSuperMode = false;
 
-// ── Supabase API ──
-async function sbFetch(table, method='GET', body=null, query=''){
-  const res = await fetch(`${SB_URL}/rest/v1/${table}${query}`, {
-    method,
-    headers:{
-      'apikey': SB_KEY,
-      'Authorization': `Bearer ${SB_KEY}`,
-      'Content-Type': 'application/json',
-      'Prefer': method==='POST' ? 'return=representation' : (method==='PATCH'||method==='DELETE' ? 'return=minimal' : ''),
-    },
-    body: body ? JSON.stringify(body) : null,
-  });
-  if(!res.ok){
-    const err = await res.text();
-    throw new Error(err);
-  }
-  if(method==='DELETE'||res.status===204) return null;
-  const text = await res.text();
-  return text ? JSON.parse(text) : null;
-}
-
 // ── 讀取所有資料 ──
 async function loadFromDB(){
   showLoading(true);
   try{
-    const [nets, recs] = await Promise.all([
-      sbFetch('networks', 'GET', null, '?select=*&order=name'),
-      sbFetch('records', 'GET', null, '?select=*&order=date.desc'),
+    const [netsSnap, recsSnap] = await Promise.all([
+      fsdb.collection('networks').get(),
+      fsdb.collection('records').get(),
     ]);
-    db.networks = (nets||[]).map(n=>({
-      id:n.id, cat:n.cat||'', area:n.area||'', name:n.name||'',
-      sub:n.sub||'', catOther:n.cat_other||'', phone:n.phone||'',
-      mobile:n.mobile||'', addr:n.addr||'', noteWorker:n.note_worker||''
-    }));
-    db.records = (recs||[]).map(r=>({
-      id:r.id, type:r.type||'rec', nid:r.nid||'',
-      worker:r.worker||'', date:r.date||'', method:r.method||'', content:r.content||''
-    }));
+    db.networks = netsSnap.docs.map(doc=>{
+      const n = doc.data();
+      return {id:doc.id, cat:n.cat||'', area:n.area||'', name:n.name||'', sub:n.sub||'', catOther:n.catOther||'', phone:n.phone||'', mobile:n.mobile||'', addr:n.addr||'', noteWorker:n.noteWorker||''};
+    });
+    db.records = recsSnap.docs.map(doc=>{
+      const r = doc.data();
+      return {id:doc.id, type:r.type||'rec', nid:r.nid||'', worker:r.worker||'', date:r.date||'', method:r.method||'', content:r.content||''};
+    });
+    db.networks = sortByStroke(db.networks,'name');
+    db.records.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   }catch(e){ console.error('載入失敗',e); alert('資料載入失敗，請重新整理頁面'); }
   showLoading(false);
 }
 
 // ── 新增資源單位 ──
 async function dbAddNetwork(d){
-  const row = {id:d.id,cat:d.cat,area:d.area,name:d.name,sub:d.sub,cat_other:d.catOther,phone:d.phone,mobile:d.mobile,addr:d.addr,note_worker:d.noteWorker};
-  await sbFetch('networks','POST',row);
+  const row = {cat:d.cat,area:d.area,name:d.name,sub:d.sub,catOther:d.catOther,phone:d.phone,mobile:d.mobile,addr:d.addr,noteWorker:d.noteWorker};
+  await fsdb.collection('networks').doc(d.id).set(row);
 }
 
 // ── 更新資源單位 ──
 async function dbUpdateNetwork(id, d){
-  const row = {cat:d.cat,area:d.area,name:d.name,sub:d.sub,cat_other:d.catOther,phone:d.phone,mobile:d.mobile,addr:d.addr,note_worker:d.noteWorker};
-  await sbFetch('networks','PATCH',row,`?id=eq.${id}`);
+  const row = {cat:d.cat,area:d.area,name:d.name,sub:d.sub,catOther:d.catOther,phone:d.phone,mobile:d.mobile,addr:d.addr,noteWorker:d.noteWorker};
+  await fsdb.collection('networks').doc(id).set(row,{merge:true});
 }
 
 // ── 刪除資源單位 ──
 async function dbDeleteNetwork(id){
-  await sbFetch('networks','DELETE',null,`?id=eq.${id}`);
+  await fsdb.collection('networks').doc(id).delete();
 }
 
 // ── 新增互動記錄 ──
 async function dbAddRecord(d){
-  const row = {id:d.id,type:d.type,nid:d.nid,worker:d.worker,date:d.date,method:d.method,content:d.content};
-  await sbFetch('records','POST',row);
+  const row = {type:d.type,nid:d.nid,worker:d.worker,date:d.date,method:d.method,content:d.content};
+  await fsdb.collection('records').doc(d.id).set(row);
 }
 
 // ── 更新互動記錄社工 ──
 async function dbUpdateRecordWorker(id, worker){
-  await sbFetch('records','PATCH',{worker},`?id=eq.${id}`);
+  await fsdb.collection('records').doc(id).update({worker});
 }
 
 // ── 刪除互動記錄 ──
 async function dbDeleteRecord(id){
-  await sbFetch('records','DELETE',null,`?id=eq.${id}`);
+  await fsdb.collection('records').doc(id).delete();
 }
 
 // ── 批次新增資源單位 ──
@@ -1487,7 +1478,6 @@ function renderMgmtPagination(total,totalPages){
 
 function goMgmtPage(p){ mgmtPage=p; renderMgmt(); document.getElementById('p-mgmt').scrollTop=0; }
 
-// ── 編輯互動記錄社工姓名 ──
 // ── Modal 新增/編輯 ──
 function openModal(id){
   editId=id;
@@ -1651,14 +1641,12 @@ function setMapCat(cat, el){
 }
 
 async function geocodeAndRender(){
-  // 先從Supabase載入已有的定位結果
+  // 先從Firebase載入已有的定位結果
   try{
-    const sbCache = await sbFetch('geo_cache','GET',null,'?select=*');
-    if(sbCache && sbCache.length){
-      sbCache.forEach(r=>{ geocache[r.nid]={lat:r.lat,lng:r.lng}; });
-      saveGeoCache();
-    }
-  }catch(e){ console.log('從Supabase載入定位快取失敗，使用本機快取'); }
+    const snap = await fsdb.collection('geo_cache').get();
+    snap.forEach(doc=>{ geocache[doc.id]=doc.data(); });
+    saveGeoCache();
+  }catch(e){ console.log('從Firebase載入定位快取失敗，使用本機快取'); }
 
   const nets = db.networks.filter(n=>n.addr&&n.addr.length>4);
   const uncached = nets.filter(n=>!geocache[n.id]);
@@ -1675,13 +1663,9 @@ async function geocodeAndRender(){
           const loc = results[0].geometry.location;
           const pos = {lat: loc.lat(), lng: loc.lng()};
           geocache[n.id] = pos;
-          // 存到Supabase讓所有裝置共用
-          try{
-            await sbFetch('geo_cache','POST',{nid:n.id,lat:pos.lat,lng:pos.lng},'');
-          }catch(e){
-            try{ await sbFetch('geo_cache','PATCH',{lat:pos.lat,lng:pos.lng},`?nid=eq.${n.id}`); }
-            catch(e2){}
-          }
+          // 存到Firebase讓所有裝置共用
+          try{ await fsdb.collection('geo_cache').doc(n.id).set(pos); }
+          catch(e){ console.error('儲存定位失敗',e); }
         }
         done++;
         document.getElementById('map-status').textContent = `定位中 ${done}/${uncached.length}...`;
@@ -1696,10 +1680,15 @@ async function geocodeAndRender(){
 
 async function geocodeAll(){
   showLoading(true);
-  // 清空本機和Supabase快取
+  // 清空本機和Firebase快取
   geocache = {};
   saveGeoCache();
-  try{ await sbFetch('geo_cache','DELETE',null,'?nid=neq.null'); }catch(e){}
+  try{
+    const snap = await fsdb.collection('geo_cache').get();
+    const batch = fsdb.batch();
+    snap.forEach(doc=>batch.delete(doc.ref));
+    await batch.commit();
+  }catch(e){}
   showLoading(false);
   gmarkers.forEach(m=>m.setMap(null));
   gmarkers = [];
@@ -1829,7 +1818,7 @@ async function saveEditRec(){
   if(!content){ alert('請填寫內容'); return; }
   showLoading(true);
   try{
-    await sbFetch('records','PATCH',{type,date,worker,method,content},`?id=eq.${editRecId}`);
+    await fsdb.collection('records').doc(editRecId).update({type,date,worker,method,content});
     const rec = db.records.find(r=>r.id===editRecId);
     if(rec){ rec.type=type; rec.date=date; rec.worker=worker; rec.method=method; rec.content=content; }
     closeEditRec();
@@ -1843,7 +1832,7 @@ async function deleteRec(rid){
   if(!confirm('確定要刪除這筆互動記錄？')) return;
   showLoading(true);
   try{
-    await sbFetch('records','DELETE',null,`?id=eq.${rid}`);
+    await fsdb.collection('records').doc(rid).delete();
     db.records = db.records.filter(r=>r.id!==rid);
     renderMgmt();
     populateFilters();
@@ -1857,11 +1846,9 @@ let fixPosListener = null;
 
 async function loadGeoFixes(){
   try{
-    const res = await sbFetch('geo_fixes','GET',null,'?select=*');
-    if(res && res.length){
-      res.forEach(r=>{ geocache[r.nid]={lat:r.lat,lng:r.lng}; });
-      saveGeoCache();
-    }
+    const snap = await fsdb.collection('geo_fixes').get();
+    snap.forEach(doc=>{ geocache[doc.id]=doc.data(); });
+    saveGeoCache();
   }catch(e){ console.error('載入修正位置失敗',e); }
 }
 
@@ -1881,14 +1868,10 @@ function startFixPos(nid, name){
     // 存到本機快取
     geocache[fixPosNid] = {lat, lng};
     saveGeoCache();
-    // 存到Supabase（所有人共用）
+    // 存到Firebase（所有人共用）
     try{
-      await sbFetch('geo_fixes','POST',{nid:fixPosNid,lat,lng},'');
-    }catch(e){
-      // 如果已存在就改用PATCH更新
-      try{ await sbFetch('geo_fixes','PATCH',{lat,lng},`?nid=eq.${fixPosNid}`); }
-      catch(e2){ console.error('儲存修正位置失敗',e2); }
-    }
+      await fsdb.collection('geo_fixes').doc(fixPosNid).set({lat,lng});
+    }catch(e){ console.error('儲存修正位置失敗',e); }
     cancelFixPos();
     renderMarkers();
     document.getElementById('map-status').textContent = `✓「${name}」位置已修正，所有人都會看到更新！`;
